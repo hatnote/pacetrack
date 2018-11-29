@@ -1,0 +1,10 @@
+---
+name: "WikiCite NoW 2018"
+lang: en
+requested_by: "User:Peteforsyth"
+wikiproject_name: "WikiProject_Newspapers"
+campaign_start_date: 2018-06-01
+campaign_end_date: 2018-12-15
+date_created: 2018-11-29
+# article_list: article_list.yaml  # default value, next to the config
+...
