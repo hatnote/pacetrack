@@ -39,3 +39,13 @@ def getTemplatesForRevision(oldid):
     matches = re.finditer(templatePattern, transclusionReport)
 
     return [TemplateCalls(match.group(2), int(match.group(1))) for match in matches]
+
+
+def getCiteQStats(oldid):
+    """Get citation stats that is using CiteQ vs non-CiteQ"""
+    templatecalls = getTemplatesForRevision(oldid)
+    noCiteQTemplates = {'Cite_web', 'Cite_web'}
+    citeQTemplates = {'Cite_Q', 'Cite_q'}
+    nonCiteQCounts = sum([entry.calls for entry in templatecalls if entry.template in noCiteQTemplates])
+    citeQCounts = sum([entry.calls for entry in templatecalls if entry.template in citeQTemplates])
+    return (citeQCounts, nonCiteQCounts)
