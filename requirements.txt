@@ -1,0 +1,5 @@
+attrs==18.2.0
+boltons==18.0.1
+lithoxyl==0.4.3
+ruamel.ordereddict==0.4.13
+ruamel.yaml==0.15.80
