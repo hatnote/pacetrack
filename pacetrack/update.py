@@ -60,7 +60,7 @@ class PaceTracker(object):
         article_list_path = path + '/' + article_list_filename
         article_list = yaml.safe_load(open(article_list_path, 'rb'))
         kwargs = dict(config_data)
-        kwargs['article_list'] = article_list['articles'] or []
+        kwargs['article_list'] = article_list if isinstance(article_list, list) else article_list['articles'] or []
         return cls(**kwargs)
 
     @classmethod
@@ -93,6 +93,7 @@ def process_one(campaign_dir):
     # generate static pages
     pt = PaceTracker.from_path(campaign_dir)
     print(pt)
+    print(len(pt.article_list))
 
 
 def process_all():
