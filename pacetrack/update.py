@@ -40,7 +40,7 @@ def to_unicode(obj):
 
 
 @attr.s
-class PaceTracker(object):
+class PTProject(object):
     name = attr.ib()
     lang = attr.ib()
     requested_by = attr.ib()
@@ -92,6 +92,7 @@ class PaceTracker(object):
         return
 
 
+
 def get_argparser():
     desc = 'Update data for tracked projects'
     prs = ArgumentParser(description=desc)
@@ -109,7 +110,7 @@ def process_one(campaign_dir):
     # fetch data
     # output timestamped json file to campaign_dir/data/_timestamp_.json
     # generate static pages
-    pt = PaceTracker.from_path(campaign_dir)
+    pt = PTProject.from_path(campaign_dir)
     print(pt)
     print(len(pt.article_list))
     return pt
