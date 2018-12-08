@@ -15,6 +15,7 @@ Track the following features in your Wikiproject:
  - [x] Is in Wikiproject:Newspapers
  - [x] Quality assessment (only at runtime)
  - [x] Importance assessment (only at runtime)
+ - [ ] Is draft
  - [ ] How many characters
  - [ ] How many sections
  - [ ] How many interlanguage links
