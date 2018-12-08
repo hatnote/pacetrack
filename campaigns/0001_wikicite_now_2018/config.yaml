@@ -11,5 +11,14 @@ article_list:
   type: "sparql_json_file"
   path: "query.json"
   title_key: "page_titleEN"
+goals:
+  - metric: article_count
+    name: "Total Article Count"
+    target:
+      # one of the following
+      delta: 200  # 200 more articles
+      delta_ratio: 1.2  # 20% more articles than the start
+      total: 2000  # 2000 total articles
+  -
 
 ...

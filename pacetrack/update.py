@@ -40,7 +40,21 @@ def to_unicode(obj):
 
 
 @attr.s
-class PTProject(object):
+class PTArticle(object):
+    wiki = attr.ib()
+    title = attr.ib()
+    timestamp = attr.ib()
+
+    rev_id = attr.ib(default=None, repr=False)
+    content = attr.ib(default=None, repr=False)
+    templates = attr.ib(default=None, repr=False)
+    infoboxes = attr.ib(default=None, repr=False)
+    citations = attr.ib(default=None, repr=False)
+    wikidata_item = attr.ib(default=None, repr=False)
+
+
+@attr.s
+class PTCampaign(object):
     name = attr.ib()
     lang = attr.ib()
     requested_by = attr.ib()
@@ -48,9 +62,10 @@ class PTProject(object):
     campaign_start_date = attr.ib()
     campaign_end_date = attr.ib()
     date_created = attr.ib()
+    goals = attr.ib(repr=False)
     article_list_config = attr.ib(repr=False)
-    base_path = attr.ib(default=None, repr=False)
     article_list = attr.ib(default=None, repr=False)
+    base_path = attr.ib(default=None, repr=False)
 
     @classmethod
     def from_path(cls, path, autoload=True):
@@ -91,6 +106,26 @@ class PTProject(object):
             raise ValueError('expected supported article list type, not %r' % (alc['type'],))
         return
 
+    def load_articles(self):
+        "create a bunch of stub PTArticles"
+
+    def populate_article_attributes(self):
+        "look at current goals, find which attributes are needed to compute the relevant metrics"
+
+    def compute_status(self):
+        "look at goals and the now-populated PTArticles, and compute the progress, pace, etc."
+
+    def render_report(self):
+        pass
+
+    def process(self):
+        "does it all"
+        self.load_article_list()
+        self.load_articles()
+        self.populate_article_attributes()
+        self.compute_status()
+        self.render_report()
+
 
 
 def get_argparser():
@@ -110,7 +145,7 @@ def process_one(campaign_dir):
     # fetch data
     # output timestamped json file to campaign_dir/data/_timestamp_.json
     # generate static pages
-    pt = PTProject.from_path(campaign_dir)
+    pt = PTCampaign.from_path(campaign_dir)
     print(pt)
     print(len(pt.article_list))
     return pt
