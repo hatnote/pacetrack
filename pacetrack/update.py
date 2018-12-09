@@ -24,7 +24,7 @@ import attr
 from ruamel import yaml
 from boltons.strutils import slugify
 from boltons.fileutils import atomic_save
-from boltons.iterutils import unique
+from boltons.iterutils import unique, partition
 
 from log import tlog, set_debug
 from metrics import (get_revid, get_templates, get_talk_templates,
@@ -188,6 +188,24 @@ class PTCampaign(object):
         "look at goals and the now-populated PTArticles, and compute the progress, pace, etc."
         for art in self.article_list:
             art.results = eval_article_goals(self.goals, art)
+
+        ores = {}  # overall results
+        for goal in self.goals:
+            key = slugify(goal['name'])
+            target_ratio = float(goal.get('ratio', 1.0))
+
+            results = [a.results[key]['done'] for a in self.article_list]
+            done, not_done = partition(results)
+            ratio = 1.0 if not not_done else float(len(done)) / len(not_done)
+            ores[key] = {'done_count': len(done),
+                         'not_done_count': len(not_done),
+                         'total_count': len(self.article_list),
+                         'ratio': ratio,
+                         'key': key,
+                         'name': goal['name'],
+                         'done': ratio >= target_ratio,
+                         'target_ratio': target_ratio}
+        self.overall_results = ores
         return
 
     def render_report(self):
@@ -227,6 +245,10 @@ def process_one(campaign_dir):
     print('Results:')
     for art in pt.article_list:
         print('  ', (art.title, art.results))
+    print()
+    print('Overall results:')
+    for key, results in pt.overall_results.items():
+        print(' - {name}  ({done_count}/{total_count})  Done: {done}'.format(**results))
     print()
     return pt
 
