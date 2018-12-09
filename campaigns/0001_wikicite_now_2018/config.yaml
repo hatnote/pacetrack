@@ -6,5 +6,19 @@ wikiproject_name: "WikiProject_Newspapers"
 campaign_start_date: 2018-06-01
 campaign_end_date: 2018-12-15
 date_created: 2018-11-29
-article_list: "query.json"  # defaults to article_list.yaml, this is from sparql json output
+article_list:
+  # defaults to article_list.yaml, this is from sparql json output
+  type: "sparql_json_file"
+  path: "query.json"
+  title_key: "page_titleEN"
+goals:
+  - metric: article_count
+    name: "Total Article Count"
+    target:
+      # one of the following
+      delta: 200  # 200 more articles
+      delta_ratio: 1.2  # 20% more articles than the start
+      total: 2000  # 2000 total articles
+  -
+
 ...

@@ -40,7 +40,21 @@ def to_unicode(obj):
 
 
 @attr.s
-class PaceTracker(object):
+class PTArticle(object):
+    wiki = attr.ib()
+    title = attr.ib()
+    timestamp = attr.ib()
+
+    rev_id = attr.ib(default=None, repr=False)
+    content = attr.ib(default=None, repr=False)
+    templates = attr.ib(default=None, repr=False)
+    infoboxes = attr.ib(default=None, repr=False)
+    citations = attr.ib(default=None, repr=False)
+    wikidata_item = attr.ib(default=None, repr=False)
+
+
+@attr.s
+class PTCampaign(object):
     name = attr.ib()
     lang = attr.ib()
     requested_by = attr.ib()
@@ -48,20 +62,21 @@ class PaceTracker(object):
     campaign_start_date = attr.ib()
     campaign_end_date = attr.ib()
     date_created = attr.ib()
-    article_list = attr.ib(repr=False)
+    goals = attr.ib(repr=False)
+    article_list_config = attr.ib(repr=False)
+    article_list = attr.ib(default=None, repr=False)
+    base_path = attr.ib(default=None, repr=False)
 
     @classmethod
-    def from_path(cls, path):
-        print(path)
+    def from_path(cls, path, autoload=True):
         config_data = yaml.safe_load(open(path + '/config.yaml', 'rb'))
 
-        # TODO: add sparql query and wikiproject support
-        article_list_filename = config_data.pop('article_list', "article_list.yaml")
-        article_list_path = path + '/' + article_list_filename
-        article_list = yaml.safe_load(open(article_list_path, 'rb'))
-        kwargs = dict(config_data)
-        kwargs['article_list'] = article_list if isinstance(article_list, list) else article_list['articles'] or []
-        return cls(**kwargs)
+        config_data['article_list_config'] = dict(config_data.pop('article_list'))
+        config_data['base_path'] = path
+        ret = cls(**config_data)
+        if autoload:
+            ret.load_article_list()
+        return ret
 
     @classmethod
     def create_from_config(cls, name):
@@ -72,6 +87,45 @@ class PaceTracker(object):
         etc.
         """
         pass
+
+    def load_article_list(self):
+        """
+        # TODO: add sparql query and wikiproject support
+        article_list_filename = config_data.pop('article_list', "article_list.yaml")
+        article_list_path = path + '/' + article_list_filename
+        article_list = yaml.safe_load(open(article_list_path, 'rb'))
+        """
+        alc = self.article_list_config
+        if alc['type'] == 'sparql_json_file':
+            json_file_path = self.base_path + '/' + alc['path']
+            json_data = json.load(open(json_file_path))
+            title_key = alc['title_key']
+            article_list = [e[title_key] for e in json_data]
+            self.article_list = article_list
+        else:
+            raise ValueError('expected supported article list type, not %r' % (alc['type'],))
+        return
+
+    def load_articles(self):
+        "create a bunch of stub PTArticles"
+
+    def populate_article_attributes(self):
+        "look at current goals, find which attributes are needed to compute the relevant metrics"
+
+    def compute_status(self):
+        "look at goals and the now-populated PTArticles, and compute the progress, pace, etc."
+
+    def render_report(self):
+        pass
+
+    def process(self):
+        "does it all"
+        self.load_article_list()
+        self.load_articles()
+        self.populate_article_attributes()
+        self.compute_status()
+        self.render_report()
+
 
 
 def get_argparser():
@@ -91,15 +145,16 @@ def process_one(campaign_dir):
     # fetch data
     # output timestamped json file to campaign_dir/data/_timestamp_.json
     # generate static pages
-    pt = PaceTracker.from_path(campaign_dir)
+    pt = PTCampaign.from_path(campaign_dir)
     print(pt)
     print(len(pt.article_list))
+    return pt
 
 
 def process_all():
     for campaign_dir in os.listdir(CAMPAIGNS_PATH):
-        process_one(CAMPAIGNS_PATH + campaign_dir)
-
+        cur_pt = process_one(CAMPAIGNS_PATH + campaign_dir)
+    import pdb;pdb.set_trace()
 
 @tlog.wrap('critical')
 def main():
@@ -111,7 +166,6 @@ def main():
         if args.debug:
             set_debug(True)
         process_all()
-        print('success')
     except Exception:
         raise  # TODO
 
