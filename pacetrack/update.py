@@ -28,7 +28,8 @@ from boltons.iterutils import unique, partition
 
 from log import tlog, set_debug
 from metrics import (get_revid, get_templates, get_talk_templates,
-                     get_assessments, get_wikiprojects, get_citations)
+                     get_assessments, get_wikiprojects, get_citations,
+                     get_wikidata_item)
 
 CUR_PATH = os.path.dirname(os.path.abspath(__file__))
 PROJECT_PATH = os.path.dirname(CUR_PATH)
@@ -66,6 +67,10 @@ class PTArticle(object):
 
 def ref_count(pta):
     return len(pta.citations)
+
+
+def wikidata_item(pta):
+    return len(pta.wikidata_item)
 
 
 def template_count(pta, template_name=None, template_regex=None, case_sensitive=False):
@@ -182,6 +187,7 @@ class PTCampaign(object):
             art.assessments = get_assessments(art)
             art.wikiprojects = get_wikiprojects(art)
             art.citations = get_citations(art)
+            art.wikidata_item = get_wikidata_item(art)
         return
 
     def compute_status(self):
@@ -255,7 +261,8 @@ def process_one(campaign_dir):
 
 def process_all():
     for campaign_dir in os.listdir(CAMPAIGNS_PATH):
-        cur_pt = process_one(CAMPAIGNS_PATH + campaign_dir)
+        if not campaign_dir.startswith('.'):
+            cur_pt = process_one(CAMPAIGNS_PATH + campaign_dir)
     import pdb;pdb.set_trace()
 
 @tlog.wrap('critical')

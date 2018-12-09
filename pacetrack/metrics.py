@@ -42,6 +42,9 @@ def get_citations(pta):
     return _get_citations(pta.title, pta.rev_id)
 
 
+def get_wikidata_item(pta):
+    return _get_article_wikidata_item(pta.rev_id)
+
 ##
 
 def get_json(url, params=None):  # TODO: option for validating status code
@@ -102,12 +105,9 @@ def _get_article_wikidata_item(oldid):
     try:
         wbentities = resp['query']['pages'].values()[0]['wbentityusage']
     except KeyError as e:
-        return None
+        return []
 
-    # 'T' aspect means the Wikidata item corresponds to the title of the page
-    # I'm assuming there is only corresponding Wikidata item; maybe that's
-    # not safe?
-    return [q for (q, val) in wbentities.items() if 'T' in val['aspects']][0]
+    return [q for (q, val) in wbentities.items() if 'S' in val['aspects']]
 
 
 def _get_assessments(title):

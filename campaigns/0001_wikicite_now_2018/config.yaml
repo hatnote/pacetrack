@@ -27,6 +27,12 @@ goals:
     target:
       value: 2
       ratio: 1.0
+  - name: "Exists on Wikidata"
+    metric: wikidata_item
+    target:
+      value: 1
+      cmp: eq
+      ratio: 1.0
   # may be example of campaign-wide/project-wide/set-wide goal (aggregated, not per article)
   # - metric: overall_article_count
   #   name: "Overall Article Count"
