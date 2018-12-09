@@ -18,3 +18,22 @@ Probably all generated pages should have prominent last updated.
     * Can generate the article list table here (or later)
 1. Compute campaign-wide stats and projections
 1. Produce campaign page and update home page, etc.
+
+## Metrics
+
+```
+# note: keep an eye out for a pattern of count -> percent/proportion
+
+"article_exists",
+"entity_exists",
+"template_count",
+"infobox_count",
+"infobox_wd_count",
+"ref_count",
+"ref_wd_count",
+"char_count",
+"section_count",
+"image_count",
+"media_count"
+
+```

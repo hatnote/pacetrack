@@ -1,13 +1,56 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+from __future__ import print_function
+
+
 import re
 import requests
 from collections import namedtuple
 
 
 MW_API_URL = 'https://en.wikipedia.org/w/api.php'
-REST_API_URL = 'https://en.wikipedia.org/api/rest_v1/page/references/%s/%s'
+REST_API_URL = 'https://en.wikipedia.org/api/rest_v1/'
+REF_API_URL = REST_API_URL + 'page/references/%s/%s'  # TODO
 
 
-def get_revid_at_timestamp(title, timestamp):
+def format_datetime(dt):
+    return dt.isoformat().split('.')[0] + 'Z'
+
+
+def get_revid(pta):
+    return _get_revid_at_timestamp(pta.title, format_datetime(pta.timestamp))
+
+
+def get_templates(pta):
+    return _get_templates(pta.rev_id)
+
+
+def get_talk_templates(pta):
+    return _get_templates(pta.talk_rev_id)
+
+
+def get_assessments(pta):
+    return _get_assessments(pta.title)
+
+
+def get_wikiprojects(pta):
+    return [tc.replace('WikiProject ', '')  for tc in pta.talk_templates
+            if 'wikiproject' in tc.lower()]
+
+
+def get_citations(pta):
+    return _get_citations(pta.title, pta.rev_id)
+
+
+##
+
+def get_json(url, params=None):  # TODO: option for validating status code
+    print(url, params)
+    resp = requests.get(url, params=params)
+    return resp.json()
+
+
+def _get_revid_at_timestamp(title, timestamp):
     """Get page revision id at a particular timestamp
 
     :param title: a page title; note, the MW API only supports a
@@ -16,75 +59,67 @@ def get_revid_at_timestamp(title, timestamp):
     :return: a map from page title to the revision id
 
     """
-    resp = requests.get('https://en.wikipedia.org/w/api.php', params={
+    resp = get_json(MW_API_URL, params={
         'action': 'query',
         'prop': 'revisions',
         'format': 'json',
         'titles': title,
         'rvlimit': '1',
         'rvstart': timestamp
-    }).json()
+    })
     try:
         ret = {page['title']: page['revisions'][0]['revid'] for page in resp['query']['pages'].values()}
+        ret = ret.values()[0]
     except KeyError as e:
-        return {title: None}
+        ret = None
     return ret
 
 
-def get_templates(oldid):
+def _get_templates(oldid):
     """Get a list of templates as well as number of calls per template for a given revision (oldid)
 
     NOTE: we parse the info from the transclusion expansion report from the parse API, which might be unstable.
     :param oldid:
     :return: a list of
     """
-    revisionResponse = requests.get('https://en.wikipedia.org/w/api.php', params={
+    revisionResponse = get_json(MW_API_URL, params={
         'action': 'parse',
         'oldid': oldid,
         'format': 'json',
-    }).json()
+    })
 
     templates = revisionResponse['parse']['templates']
     ret = [t['*'].replace('Template:', '') for t in templates]
     return ret
 
 
-def get_article_wikidata_item(oldid):
+def _get_article_wikidata_item(oldid):
     params = {'action': 'query',
               'prop': 'wbentityusage',
               'revids': oldid,
               'format': 'json'}
-    resp = requests.get(MW_API_URL, params)
+    resp = get_json(MW_API_URL, params)
     try:
-        wbentities = resp.json()['query']['pages'].values()[0]['wbentityusage']
+        wbentities = resp['query']['pages'].values()[0]['wbentityusage']
     except KeyError as e:
         return None
-    
+
     # 'T' aspect means the Wikidata item corresponds to the title of the page
     # I'm assuming there is only corresponding Wikidata item; maybe that's
     # not safe?
     return [q for (q, val) in wbentities.items() if 'T' in val['aspects']][0]
 
 
-def get_assessments(title):
-    # I don't think you can actually get assessments from past
-    # versions of an article
+def _get_assessments(title):
+    # can't actually get assessments from past versions of an article
+    # see: https://phabricator.wikimedia.org/T211485
     params = {'action': 'query',
               'prop': 'pageassessments',
               'titles': title,
               'formatversion': 2,
               'format': 'json'}
-    resp = requests.get(MW_API_URL, params)
-    return resp.json()['query']['pages'][0]['pageassessments']
-    
-
-
-def check_existence(title, timestamp):
-    try:
-        oldid_map = getPageRevIdAtTimestamp(title, timestamp)
-    except KeyError as e:
-        return False
-    return True
+    resp = get_json(MW_API_URL, params)
+    return resp['query']['pages'][0]['pageassessments']
 
 
 def check_infobox(template_calls):
@@ -103,7 +138,7 @@ def check_infobox_wikidata(template_calls):
 
 
 def get_wikiproject(wikiproject, talk_revid):
-    talk_templates = get_templates(talk_revid)
+    talk_templates = _get_templates(talk_revid)
     wikiprojects = [tc.replace('WikiProject ', '')  for tc in talk_templates
                     if 'wikiproject' in tc.lower()]
 
@@ -112,12 +147,16 @@ def get_wikiproject(wikiproject, talk_revid):
     return False
 
 
-def get_citation_stats(title, oldid):
-    article_cites_rest_url = REST_API_URL % (title, oldid)
-    
-    resp = requests.get(article_cites_rest_url)
-    citations = resp.json()
+def _get_citations(title, old_id):
+    api_url = REF_API_URL % (title, old_id)
 
+    citations = get_json(api_url)
+
+    return citations
+
+
+def get_citation_stats(title, oldid):
+    citations = _get_citations(title, oldid)
     try:
         ref_count = len(citations['references_by_id'].keys())
     except KeyError as e:
@@ -132,23 +171,23 @@ def get_citation_stats(title, oldid):
         ref_wikidata_percent = ref_wikidata_count / (ref_count * 1.0)
     else:
         ref_wikidata_percent = 0
-        
+
     return {'reference_count': ref_count,
             'reference_wikidata_count': ref_wikidata_count,
             'reference_wikidata_percent': ref_wikidata_percent}
 
-def get_all_stats(title, wikiproject, date):
-    revid_map = get_revid_at_timestamp(title, date)
-    revid = revid_map[title]
 
-    talk_revid_map = get_revid_at_timestamp('Talk:' + title, date)
-    talk_revid = talk_revid_map['Talk:' + title]
-    
-    templates = get_templates(revid)
-    assessments = get_assessments(title)
+def get_all_stats(title, wikiproject, date):
+    revid = _get_revid_at_timestamp(title, date)
+
+    talk_title = 'Talk:' + title
+    talk_revid = _get_revid_at_timestamp(talk_title, date)
+
+    templates = _get_templates(revid)
+    assessments = _get_assessments(title)
 
     stats = {'wikipedia_exists': revid,
-             'wikidata_exists': get_article_wikidata_item(revid),
+             'wikidata_exists': _get_article_wikidata_item(revid),
              'infobox': check_infobox(templates),
              'infobox_wikidata': check_infobox_wikidata(templates),
              'citation_stats': get_citation_stats(title, revid),
@@ -158,7 +197,7 @@ def get_all_stats(title, wikiproject, date):
              'metadata': {'target_date': date,
                           'revision': revid,
                           'talk_revision': talk_revid}}
-    
+
     return stats
 
 
@@ -168,11 +207,10 @@ if __name__ == '__main__':
     date = '2018-12-05T20:00:00Z'
 
     stats = get_all_stats(title, wikiproject, date)
-    print stats
+    print(stats)
 
     old_date = '2010-12-05T20:00:00Z'
     stats = get_all_stats(title, wikiproject, old_date)
-    print stats
-    
-    import pdb;pdb.set_trace()
+    print(stats)
 
+    import pdb;pdb.set_trace()

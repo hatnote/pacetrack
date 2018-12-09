@@ -6,12 +6,15 @@
   Update script to load data for tracked wikiproject campaigns
 
 """
+from __future__ import unicode_literals
 from __future__ import print_function
 
 import os
 import sys
 import json
 import uuid
+import datetime
+import operator
 import traceback
 from time import strftime
 from pipes import quote as shell_quote
@@ -19,9 +22,13 @@ from argparse import ArgumentParser
 
 import attr
 from ruamel import yaml
+from boltons.strutils import slugify
 from boltons.fileutils import atomic_save
+from boltons.iterutils import unique
 
 from log import tlog, set_debug
+from metrics import (get_revid, get_templates, get_talk_templates,
+                     get_assessments, get_wikiprojects, get_citations)
 
 CUR_PATH = os.path.dirname(os.path.abspath(__file__))
 PROJECT_PATH = os.path.dirname(CUR_PATH)
@@ -41,16 +48,60 @@ def to_unicode(obj):
 
 @attr.s
 class PTArticle(object):
-    wiki = attr.ib()
+    lang = attr.ib()
     title = attr.ib()
     timestamp = attr.ib()
 
-    rev_id = attr.ib(default=None, repr=False)
+    rev_id = attr.ib(default=None)
+    talk_rev_id = attr.ib(default=None, repr=False)
+
     content = attr.ib(default=None, repr=False)
+    assessments = attr.ib(default=None, repr=False)
     templates = attr.ib(default=None, repr=False)
+    talk_templates = attr.ib(default=None, repr=False)
     infoboxes = attr.ib(default=None, repr=False)
     citations = attr.ib(default=None, repr=False)
     wikidata_item = attr.ib(default=None, repr=False)
+
+
+def ref_count(pta):
+    return len(pta.citations)
+
+
+def template_count(pta, template_name=None, template_regex=None, case_sensitive=False):
+    tmpl_names = pta.templates
+    if not case_sensitive:
+        tmpl_names = unique([t.lower() for t in tmpl_names])
+        template_name = template_name.lower()
+    if not template_name:
+        return len(tmpl_names)
+    # TODO: regex support
+    return len([t for t in tmpl_names if template_name in t])
+
+
+def eval_one_article_goal(goal, pta):
+    ret = {}
+    metric_func = globals()[goal['metric']]
+    metric_args = goal.get('metric_args', {})
+    metric_val = metric_func(pta, **metric_args)
+    target_val = goal['target']['value']
+    cmp_name = goal['target'].get('cmp', 'ge')
+    if cmp_name == 'bool':
+        return bool(metric_val)
+    cmp_func = getattr(operator, cmp_name, None)
+    ret['cur'] = metric_val
+    ret['target'] = target_val
+    ret['cmp'] = cmp_name
+    ret['done'] = cmp_func(metric_val, target_val)
+    return ret
+
+
+def eval_article_goals(goals, pta):
+    ret = {}
+    for goal in goals:
+        # maybe default name to metric name, need to precheck they don't collide
+        ret[slugify(goal['name'])] = eval_one_article_goal(goal, pta)
+    return ret
 
 
 @attr.s
@@ -64,18 +115,25 @@ class PTCampaign(object):
     date_created = attr.ib()
     goals = attr.ib(repr=False)
     article_list_config = attr.ib(repr=False)
+    target_timestamp = attr.ib(default=attr.Factory(datetime.datetime.utcnow))
+    article_title_list = attr.ib(default=None, repr=False)
     article_list = attr.ib(default=None, repr=False)
     base_path = attr.ib(default=None, repr=False)
 
     @classmethod
-    def from_path(cls, path, autoload=True):
+    def from_path(cls, path, timestamp=None):
         config_data = yaml.safe_load(open(path + '/config.yaml', 'rb'))
 
-        config_data['article_list_config'] = dict(config_data.pop('article_list'))
-        config_data['base_path'] = path
-        ret = cls(**config_data)
-        if autoload:
-            ret.load_article_list()
+        kwargs = dict(config_data)
+        kwargs['article_list_config'] = dict(kwargs.pop('article_list'))
+        kwargs['base_path'] = path
+
+        assert 'target_timestamp' not in kwargs
+        if timestamp is not None:
+            kwargs['target_timestamp'] = timestamp
+
+        ret = cls(**kwargs)
+
         return ret
 
     @classmethod
@@ -101,19 +159,36 @@ class PTCampaign(object):
             json_data = json.load(open(json_file_path))
             title_key = alc['title_key']
             article_list = [e[title_key] for e in json_data]
-            self.article_list = article_list
+            self.article_title_list = article_list
         else:
             raise ValueError('expected supported article list type, not %r' % (alc['type'],))
         return
 
     def load_articles(self):
         "create a bunch of stub PTArticles"
+        article_list = []
+        for title in self.article_title_list:
+            cur_pta = PTArticle(lang=self.lang, title=title, timestamp=self.target_timestamp)
+            cur_pta.rev_id = get_revid(cur_pta)
+            article_list.append(cur_pta)
+        self.article_list = article_list
+        return
 
-    def populate_article_attributes(self):
+    def populate_article_features(self):
         "look at current goals, find which attributes are needed to compute the relevant metrics"
+        for art in self.article_list:
+            art.templates = get_templates(art)
+            art.talk_templates = get_talk_templates(art)
+            art.assessments = get_assessments(art)
+            art.wikiprojects = get_wikiprojects(art)
+            art.citations = get_citations(art)
+        return
 
     def compute_status(self):
         "look at goals and the now-populated PTArticles, and compute the progress, pace, etc."
+        for art in self.article_list:
+            art.results = eval_article_goals(self.goals, art)
+        return
 
     def render_report(self):
         pass
@@ -122,7 +197,7 @@ class PTCampaign(object):
         "does it all"
         self.load_article_list()
         self.load_articles()
-        self.populate_article_attributes()
+        self.populate_article_features()
         self.compute_status()
         self.render_report()
 
@@ -147,7 +222,12 @@ def process_one(campaign_dir):
     # generate static pages
     pt = PTCampaign.from_path(campaign_dir)
     print(pt)
-    print(len(pt.article_list))
+    pt.process()
+    print()
+    print('Results:')
+    for art in pt.article_list:
+        print('  ', (art.title, art.results))
+    print()
     return pt
 
 

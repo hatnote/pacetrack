@@ -12,13 +12,28 @@ article_list:
   path: "query.json"
   title_key: "page_titleEN"
 goals:
-  - metric: article_count
-    name: "Total Article Count"
+  - name: "Has Newspaper Infobox"
+    metric: template_count
+    metric_args:
+      template_name: Infobox Newspaper
+      case_sensitive: False
     target:
-      # one of the following
-      delta: 200  # 200 more articles
-      delta_ratio: 1.2  # 20% more articles than the start
-      total: 2000  # 2000 total articles
-  -
+      value: 1
+      cmp: eq  # gt, ge, lt, le, eq, ne, bool  (default ge)
+      ratio: 1.0  # 100% coverage
+      # total: 500  # 500 articles, mutually exclusive with above
+  - name: "Citation count"
+    metric: ref_count
+    target:
+      value: 2
+      ratio: 1.0
+  # may be example of campaign-wide/project-wide/set-wide goal (aggregated, not per article)
+  # - metric: overall_article_count
+  #   name: "Overall Article Count"
+  #   target:
+  #     # one of the following
+  #     delta: 200  # 200 more articles
+  #     delta_relative: 1.2  # 20% more articles than the start
+  #     total: 2000  # 2000 total articles
 
 ...
