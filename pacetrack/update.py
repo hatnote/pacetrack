@@ -23,8 +23,8 @@ from argparse import ArgumentParser
 import attr
 from ruamel import yaml
 from boltons.strutils import slugify
-from boltons.fileutils import atomic_save
-from boltons.iterutils import unique, partition
+from boltons.fileutils import atomic_save, iter_find_files
+from boltons.iterutils import unique, partition, first
 
 from log import tlog, set_debug
 from metrics import (get_revid, get_templates, get_talk_templates,
@@ -97,7 +97,17 @@ def eval_one_article_goal(goal, pta):
     ret['cur'] = metric_val
     ret['target'] = target_val
     ret['cmp'] = cmp_name
-    ret['done'] = cmp_func(metric_val, target_val)
+    done = cmp_func(metric_val, target_val)
+    ret['done'] = done
+
+    start_val = 0.0  # TODO
+
+    remaining = 0.0 if done else target_val - metric_val
+    ret['remaining'] = remaining
+
+    progress = (metric_val - start_val) / (target_val - start_val)
+    ret['progress'] = progress
+
     return ret
 
 
@@ -107,6 +117,62 @@ def eval_article_goals(goals, pta):
         # maybe default name to metric name, need to precheck they don't collide
         ret[slugify(goal['name'])] = eval_one_article_goal(goal, pta)
     return ret
+
+
+@attr.s
+class PTCampaignState(object):
+    campaign = attr.ib()
+    timestamp = attr.ib()
+    overall_results = attr.ib()
+    specific_results = attr.ib(default=None)
+    article_list = attr.ib(default=None)
+    _state_file_save_date = attr.ib(default=None)
+
+    @property
+    def is_start_state(self):
+        # not really use, but illustrates the intended semantics
+        return self.timestamp == self.campaign.start_state.timestamp
+
+    @classmethod
+    def from_timestamp(cls, campaign, timestamp, full=True):
+        # TODO: support for hour/minute when present in timestamp
+        if full:
+            strf_tmpl = '/data/%Y%m/state_full_%Y%m%d_*.json'
+        else:
+            strf_tmpl = '/data/%Y%m/state_%Y%m%d_*.json'
+
+        start_pattern = timestamp.strftime(strf_tmpl)
+        dir_path = campaign.base_path + os.path.split(start_pattern)[0]
+        file_path = sorted(iter_find_files(dir_path, os.path.split(start_pattern)[1]))[0]
+
+        with open(file_path, 'rb') as f:
+            state_data = json.load(f)
+
+        ret = cls(campaign=campaign,
+                  timestamp=timestamp,
+                  overall_results=state_data['overall_results'],
+                  specific_results=state_data['specific_results'] if full else None,
+                  article_list=state_data['article_list'],
+                  _state_file_save_date=state_data['save_date'])
+
+        return ret
+
+    @classmethod
+    def from_api(cls, campaign):
+        pass
+
+    def save(self):
+        """save to campaign_dir/data/YYYYMM/state_YYMMDD_HHMMSS.json
+        and campaign_dir/data/YYYYMM/state_full_YYMMDD_HHMMSS.json"""
+        save_timestamp = datetime.datetime.utcnow().isoformat()
+
+
+def to_date(dordt):
+    if isinstance(dordt, datetime.date):
+        return dordt
+    elif isinstance(dordt, datetime.datetime):
+        return dordt.date()
+    raise ValueError('expected date or datetime, not: %r' % (dordt,))
 
 
 @attr.s
@@ -122,6 +188,7 @@ class PTCampaign(object):
     article_list_config = attr.ib(repr=False)
     target_timestamp = attr.ib(default=attr.Factory(datetime.datetime.utcnow))
     article_title_list = attr.ib(default=None, repr=False)
+    start_state = attr.ib(default=None, repr=False)
     article_list = attr.ib(default=None, repr=False)
     base_path = attr.ib(default=None, repr=False)
 
@@ -138,6 +205,8 @@ class PTCampaign(object):
             kwargs['target_timestamp'] = timestamp
 
         ret = cls(**kwargs)
+
+        start_state = PTCampaignState.from_timestamp(ret, ret.campaign_start_date)
 
         return ret
 
@@ -201,14 +270,18 @@ class PTCampaign(object):
             target_ratio = float(goal.get('ratio', 1.0))
 
             results = [a.results[key]['done'] for a in self.article_list]
+            # TODO: average/median metric value
+
             done, not_done = partition(results)
             ratio = 1.0 if not not_done else float(len(done)) / len(not_done)
             ores[key] = {'done_count': len(done),
                          'not_done_count': len(not_done),
                          'total_count': len(self.article_list),
                          'ratio': ratio,
+                         'target_ratio': target_ratio,
                          'key': key,
                          'name': goal['name'],
+                         'progress': ratio / target_ratio,
                          'done': ratio >= target_ratio,
                          'target_ratio': target_ratio}
         self.overall_results = ores
@@ -245,6 +318,8 @@ def process_one(campaign_dir):
     # output timestamped json file to campaign_dir/data/_timestamp_.json
     # generate static pages
     pt = PTCampaign.from_path(campaign_dir)
+    # TODO: if data doesn't exist for the campaign's start date, just
+    # automatically populate it before doing the current time.
     print(pt)
     pt.process()
     print()
