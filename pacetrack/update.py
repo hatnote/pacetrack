@@ -23,8 +23,9 @@ from argparse import ArgumentParser
 import attr
 from ruamel import yaml
 from boltons.strutils import slugify
-from boltons.fileutils import atomic_save, iter_find_files
+from boltons.fileutils import atomic_save, iter_find_files, mkdir_p
 from boltons.iterutils import unique, partition, first
+from boltons.timeutils import isoparse
 
 from log import tlog, set_debug
 from metrics import (get_revid, get_templates, get_talk_templates,
@@ -56,13 +57,16 @@ class PTArticle(object):
     rev_id = attr.ib(default=None)
     talk_rev_id = attr.ib(default=None, repr=False)
 
-    content = attr.ib(default=None, repr=False)
-    assessments = attr.ib(default=None, repr=False)
-    templates = attr.ib(default=None, repr=False)
-    talk_templates = attr.ib(default=None, repr=False)
-    infoboxes = attr.ib(default=None, repr=False)
-    citations = attr.ib(default=None, repr=False)
-    wikidata_item = attr.ib(default=None, repr=False)
+    content = attr.ib(default=attr.Factory(list), repr=False)
+    assessments = attr.ib(default=attr.Factory(list), repr=False)
+    templates = attr.ib(default=attr.Factory(list), repr=False)
+    talk_templates = attr.ib(default=attr.Factory(list), repr=False)
+    wikiprojects = attr.ib(default=attr.Factory(list), repr=False)
+    infoboxes = attr.ib(default=attr.Factory(list), repr=False)
+    citations = attr.ib(default=attr.Factory(list), repr=False)
+    wikidata_item = attr.ib(default=attr.Factory(list), repr=False)
+
+    results = attr.ib(default=None, repr=False)
 
 
 def ref_count(pta):
@@ -119,19 +123,54 @@ def eval_article_goals(goals, pta):
     return ret
 
 
+class StateNotFound(Exception):
+    pass
+
+
 @attr.s
 class PTCampaignState(object):
     campaign = attr.ib()
     timestamp = attr.ib()
-    overall_results = attr.ib()
-    specific_results = attr.ib(default=None)
-    article_list = attr.ib(default=None)
+    overall_results = attr.ib(repr=False)
+    specific_results = attr.ib(default=None, repr=False)
+    article_list = attr.ib(default=None, repr=False)
     _state_file_save_date = attr.ib(default=None)
 
     @property
     def is_start_state(self):
         # not really use, but illustrates the intended semantics
         return self.timestamp == self.campaign.start_state.timestamp
+
+    @classmethod
+    def from_json_path(cls, campaign, json_path, full):
+        with open(json_path, 'rb') as f:
+            state_data = json.load(f)
+
+        ret = cls(campaign=campaign,
+                  timestamp=isoparse(state_data['timestamp']),
+                  overall_results=state_data['overall_results'],
+                  specific_results=state_data['specific_results'] if full else None,
+                  # title_list=state_data['title_list'],  # no use for this yet
+                  state_file_save_date=state_data['save_date'])
+        return ret
+
+    @classmethod
+    def from_latest(cls, campaign, full=True):
+        data_base_dir = campaign.base_path + '/data/'
+        data_dirs = next(os.walk(data_base_dir))[1]
+        data_dirs = [d for d in data_dirs if d.isdigit()]  # only numeric dir names
+        if not data_dirs:
+            raise StateNotFound('no numeric data directories found in %r' % data_base_dir)
+        latest_dir = data_base_dir + sorted(data_dirs)[-1]
+
+        if full:
+            pattern = 'state_full_*.json'
+        else:
+            pattern = 'state_*.json'
+
+        latest_file_path = sorted(iter_find_files(latest_dir, pattern))[-1]
+
+        return cls.from_json_path(campaign, latest_file_path, full=full)
 
     @classmethod
     def from_timestamp(cls, campaign, timestamp, full=True):
@@ -143,28 +182,90 @@ class PTCampaignState(object):
 
         start_pattern = timestamp.strftime(strf_tmpl)
         dir_path = campaign.base_path + os.path.split(start_pattern)[0]
-        file_path = sorted(iter_find_files(dir_path, os.path.split(start_pattern)[1]))[0]
+        file_paths = sorted(iter_find_files(dir_path, os.path.split(start_pattern)[1]))
+        try:
+            first_path = file_paths[0]
+        except IndexError:
+            raise StateNotFound('no state found for campaign %r at timestamp %s'
+                                % (campaign, timestamp))
 
-        with open(file_path, 'rb') as f:
-            state_data = json.load(f)
-
-        ret = cls(campaign=campaign,
-                  timestamp=timestamp,
-                  overall_results=state_data['overall_results'],
-                  specific_results=state_data['specific_results'] if full else None,
-                  article_list=state_data['article_list'],
-                  _state_file_save_date=state_data['save_date'])
-
-        return ret
+        return cls.from_json_path(campaign, first_path, full=full)
 
     @classmethod
-    def from_api(cls, campaign):
-        pass
+    def from_api(cls, campaign, timestamp=None):
+        timestamp = timestamp if timestamp is not None else datetime.datetime.utcnow()
+        ret = cls(campaign=campaign,
+                  timestamp=timestamp,
+                  overall_results=None,
+                  specific_results=None)
+
+        article_list = []
+        for title in campaign.article_title_list:
+            pta = PTArticle(lang=campaign.lang, title=title, timestamp=timestamp)
+            pta.rev_id = get_revid(pta)
+
+            if pta.rev_id:
+                pta.templates = get_templates(pta)
+                pta.talk_templates = get_talk_templates(pta)
+                pta.assessments = get_assessments(pta)
+                pta.wikiprojects = get_wikiprojects(pta)
+                pta.citations = get_citations(pta)
+                pta.wikidata_item = get_wikidata_item(pta)
+
+            pta.results = eval_article_goals(campaign.goals, pta)
+
+            article_list.append(pta)
+        ret.article_list = article_list
+
+        ores = {}  # overall results
+        for goal in campaign.goals:
+            key = slugify(goal['name'])
+            target_ratio = float(goal.get('ratio', 1.0))
+
+            results = [a.results[key]['done'] for a in article_list]
+            # TODO: average/median metric value
+
+            done, not_done = partition(results)
+            # TODO: need to integrate start state for progress tracking
+            ratio = 1.0 if not not_done else float(len(done)) / len(article_list)
+            ores[key] = {'done_count': len(done),
+                         'not_done_count': len(not_done),
+                         'total_count': len(article_list),
+                         'ratio': ratio,
+                         'target_ratio': target_ratio,
+                         'key': key,
+                         'name': goal['name'],
+                         'progress': ratio / target_ratio,
+                         'done': ratio >= target_ratio}
+        ret.overall_results = ores
+        ret.specific_results = [attr.asdict(a) for a in article_list]
+        return ret
 
     def save(self):
         """save to campaign_dir/data/YYYYMM/state_YYMMDD_HHMMSS.json
         and campaign_dir/data/YYYYMM/state_full_YYMMDD_HHMMSS.json"""
+        if not self.overall_results or not self.specific_results:
+            raise RuntimeError('only intended to be called after a full results population with from_api()')
         save_timestamp = datetime.datetime.utcnow().isoformat()
+
+        result_path = self.campaign.base_path + self.timestamp.strftime('/data/%Y%m/state_%Y%m%d_%H%M%S.json')
+        mkdir_p(os.path.split(result_path)[0])
+
+        result_data = {'campaign_name': self.campaign.name,
+                       'timestamp': self.timestamp,
+                       'save_date': save_timestamp,
+                       'overall_results': self.overall_results,
+                       'title_list': self.campaign.article_title_list}
+        with atomic_save(result_path) as f:
+            json.dump(result_data, f, indent=2, sort_keys=True, default=str)
+
+        full_result_path = self.campaign.base_path + self.timestamp.strftime('/data/%Y%m/state_full_%Y%m%d_%H%M%S.json')
+        result_data['specific_results'] = [attr.asdict(a) for a in self.article_list]
+        with atomic_save(full_result_path) as f:
+            json.dump(result_data, f, default=str)
+
+        return
+
 
 
 def to_date(dordt):
@@ -186,27 +287,34 @@ class PTCampaign(object):
     date_created = attr.ib()
     goals = attr.ib(repr=False)
     article_list_config = attr.ib(repr=False)
-    target_timestamp = attr.ib(default=attr.Factory(datetime.datetime.utcnow))
+
     article_title_list = attr.ib(default=None, repr=False)
     start_state = attr.ib(default=None, repr=False)
-    article_list = attr.ib(default=None, repr=False)
+    latest_state = attr.ib(default=None, repr=False)  # populate with load_latest_state()
+
     base_path = attr.ib(default=None, repr=False)
 
     @classmethod
-    def from_path(cls, path, timestamp=None):
+    def from_path(cls, path, auto_start_state=True):
         config_data = yaml.safe_load(open(path + '/config.yaml', 'rb'))
 
         kwargs = dict(config_data)
         kwargs['article_list_config'] = dict(kwargs.pop('article_list'))
         kwargs['base_path'] = path
 
-        assert 'target_timestamp' not in kwargs
-        if timestamp is not None:
-            kwargs['target_timestamp'] = timestamp
-
         ret = cls(**kwargs)
 
-        start_state = PTCampaignState.from_timestamp(ret, ret.campaign_start_date)
+        try:
+            start_state = PTCampaignState.from_timestamp(ret, ret.campaign_start_date)
+        except StateNotFound as snf:
+            if not auto_start_state:
+                raise
+            print('start state not found (got %r), backfilling...' % snf)
+            ret.load_article_list()
+            start_state = PTCampaignState.from_api(ret, ret.campaign_start_date)
+            start_state.save()
+
+        ret.start_state = start_state
 
         return ret
 
@@ -238,64 +346,30 @@ class PTCampaign(object):
             raise ValueError('expected supported article list type, not %r' % (alc['type'],))
         return
 
-    def load_articles(self):
-        "create a bunch of stub PTArticles"
-        article_list = []
-        for title in self.article_title_list:
-            cur_pta = PTArticle(lang=self.lang, title=title, timestamp=self.target_timestamp)
-            cur_pta.rev_id = get_revid(cur_pta)
-            article_list.append(cur_pta)
-        self.article_list = article_list
-        return
+    def load_all_states(self, full=False):
+        """TODO: probably use a function like this to load in all available
+        data for charting or pace calculation"""
+        pass
 
-    def populate_article_features(self):
-        "look at current goals, find which attributes are needed to compute the relevant metrics"
-        for art in self.article_list:
-            art.templates = get_templates(art)
-            art.talk_templates = get_talk_templates(art)
-            art.assessments = get_assessments(art)
-            art.wikiprojects = get_wikiprojects(art)
-            art.citations = get_citations(art)
-            art.wikidata_item = get_wikidata_item(art)
-        return
-
-    def compute_status(self):
-        "look at goals and the now-populated PTArticles, and compute the progress, pace, etc."
-        for art in self.article_list:
-            art.results = eval_article_goals(self.goals, art)
-
-        ores = {}  # overall results
-        for goal in self.goals:
-            key = slugify(goal['name'])
-            target_ratio = float(goal.get('ratio', 1.0))
-
-            results = [a.results[key]['done'] for a in self.article_list]
-            # TODO: average/median metric value
-
-            done, not_done = partition(results)
-            ratio = 1.0 if not not_done else float(len(done)) / len(not_done)
-            ores[key] = {'done_count': len(done),
-                         'not_done_count': len(not_done),
-                         'total_count': len(self.article_list),
-                         'ratio': ratio,
-                         'target_ratio': target_ratio,
-                         'key': key,
-                         'name': goal['name'],
-                         'progress': ratio / target_ratio,
-                         'done': ratio >= target_ratio,
-                         'target_ratio': target_ratio}
-        self.overall_results = ores
+    def record_state(self, timestamp=None):
+        if not timestamp:
+            timestamp = datetime.datetime.utcnow()
+        start_state = PTCampaignState.from_api(self, timestamp)
+        start_state.save()
         return
 
     def render_report(self):
         pass
 
-    def process(self):
+    def load_latest_state(self):
+        self.latest_state = PTCampaignState.from_latest(self)
+
+    def update(self):
         "does it all"
         self.load_article_list()
-        self.load_articles()
-        self.populate_article_features()
-        self.compute_status()
+        self.load_latest_state()
+        self.record_state()  # defults to now
+        self.load_latest_state()
         self.render_report()
 
 
@@ -321,14 +395,14 @@ def process_one(campaign_dir):
     # TODO: if data doesn't exist for the campaign's start date, just
     # automatically populate it before doing the current time.
     print(pt)
-    pt.process()
+    pt.update()
     print()
     print('Results:')
-    for art in pt.article_list:
-        print('  ', (art.title, art.results))
+    for res in pt.latest_state.specific_results:
+        print('  ', (res['title'], res['results']))
     print()
     print('Overall results:')
-    for key, results in pt.overall_results.items():
+    for key, results in pt.latest_state.overall_results.items():
         print(' - {name}  ({done_count}/{total_count})  Done: {done}'.format(**results))
     print()
     return pt
