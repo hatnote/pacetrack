@@ -23,7 +23,7 @@ from argparse import ArgumentParser
 import attr
 from ruamel import yaml
 from boltons.strutils import slugify
-from boltons.fileutils import atomic_save
+from boltons.fileutils import atomic_save, mkdir_p
 from boltons.iterutils import unique, partition
 
 from log import tlog, set_debug
@@ -188,6 +188,7 @@ class PTCampaign(object):
             art.wikiprojects = get_wikiprojects(art)
             art.citations = get_citations(art)
             art.wikidata_item = get_wikidata_item(art)
+        # Save fetch start/end time? If there are many articles, this could take a while
         return
 
     def compute_status(self):
@@ -214,6 +215,30 @@ class PTCampaign(object):
         self.overall_results = ores
         return
 
+    def to_json(self):
+        # In progress...
+        # Should include more from config
+        report = {'save': {'date': datetime.datetime.utcnow().isoformat()},
+                  'overall_results': self.overall_results,
+                  'article_results': [{'title': art.title, "results": art.results} 
+                                      for art in self.article_list]}
+        return json.dumps(report, indent=2, sort_keys=True)
+
+    def save(self):
+        "output timestamped json file to campaign_dir/data/_timestamp_.json"
+        timestamp = datetime.datetime.utcnow().strftime('%Y%m%d%H%M%s')
+        # Use a different filename for debug/test?
+        out_path = self.base_path + '/data/' + timestamp + '.json'
+        json_report = self.to_json()
+        try:
+            out_file = open(out_path, 'w')
+        except IOError:
+            mkdir_p(os.path.dirname(out_path))
+            out_file = open(out_path, 'w')
+        with out_file:
+            out_file.write(json_report)
+        return
+
     def render_report(self):
         pass
 
@@ -223,6 +248,7 @@ class PTCampaign(object):
         self.load_articles()
         self.populate_article_features()
         self.compute_status()
+        self.save()
         self.render_report()
 
 
