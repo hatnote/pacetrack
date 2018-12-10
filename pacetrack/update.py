@@ -22,7 +22,7 @@ from argparse import ArgumentParser
 
 import attr
 from ruamel import yaml
-
+from ashes import AshesEnv
 from boltons.strutils import slugify
 from boltons.fileutils import atomic_save, iter_find_files, mkdir_p
 from boltons.iterutils import unique, partition, first
@@ -34,12 +34,17 @@ from metrics import (get_revid, get_templates, get_talk_templates,
                      get_wikidata_item)
 
 CUR_PATH = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_PATH = CUR_PATH + '/templates/'
 PROJECT_PATH = os.path.dirname(CUR_PATH)
 CAMPAIGNS_PATH = PROJECT_PATH + '/campaigns/'
+STATIC_PATH = PROJECT_PATH + '/static/'
 
 RUN_UUID = uuid.uuid4()
 
 DEBUG = False
+
+ASHES_ENV = AshesEnv(TEMPLATE_PATH)
+ASHES_ENV.load_all()
 
 
 def to_unicode(obj):
@@ -268,7 +273,6 @@ class PTCampaignState(object):
         return
 
 
-
 def to_date(dordt):
     if isinstance(dordt, datetime.date):
         return dordt
@@ -277,11 +281,20 @@ def to_date(dordt):
     raise ValueError('expected date or datetime, not: %r' % (dordt,))
 
 
+def validate_campaign_id(_, __, id_text):
+    if slugify(id_text) == id_text:
+        return
+    raise ValueError('expected campaign id to consist of lowercase printable characters,'
+                     ' with no punctuation except for underscores, like "%s", not %r'
+                     % (slugify(id_text), id_text))
+
+
 @attr.s
 class PTCampaign(object):
+    id = attr.ib(validator=validate_campaign_id)
     name = attr.ib()
     lang = attr.ib()
-    requested_by = attr.ib()
+    contacts = attr.ib()
     wikiproject_name = attr.ib()
     campaign_start_date = attr.ib()
     campaign_end_date = attr.ib()
@@ -384,7 +397,25 @@ class PTCampaign(object):
         return
 
     def render_report(self):
-        pass
+        ctx = {'id': self.id,
+               'name': self.name,
+               'lang': self.lang,
+               'contacts': self.contacts,
+               'wikiproject_name': self.wikiproject_name,
+               'campaign_start_date': self.campaign_start_date.isoformat(),
+               'campaign_end_date': self.campaign_end_date.isoformat(),
+               'date_created': self.date_created.isoformat(),
+               'goals': self.goals,
+               'start_state_overall': self.start_state.overall_results,
+               'latest_state_overall': self.latest_state.overall_results,
+        }
+        report_html = ASHES_ENV.render('campaign.html', ctx)
+        report_path = STATIC_PATH + ('campaigns/%s/index.html' % self.id)
+        mkdir_p(os.path.split(report_path)[0])
+        with atomic_save(report_path) as f:
+            f.write(report_html)
+        return
+
 
     def load_latest_state(self):
         self.latest_state = PTCampaignState.from_latest(self)
