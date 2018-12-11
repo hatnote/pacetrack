@@ -329,6 +329,7 @@ class PTCampaign(object):
             ret.load_article_list()
             start_state = PTCampaignState.from_api(ret, ret.campaign_start_date)
             start_state.save()
+            print('backfilling complete')
 
         ret.start_state = start_state
 
@@ -472,7 +473,7 @@ def process_all():
     for campaign_dir in os.listdir(CAMPAIGNS_PATH):
         if not campaign_dir.startswith('.'):
             cur_pt = process_one(CAMPAIGNS_PATH + campaign_dir)
-    import pdb;pdb.set_trace()
+    # import pdb;pdb.set_trace()
 
 @tlog.wrap('critical')
 def main():

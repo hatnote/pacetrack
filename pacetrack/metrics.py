@@ -4,8 +4,9 @@ from __future__ import print_function
 
 
 import re
+import datetime
+
 import requests
-from collections import namedtuple
 
 
 MW_API_URL = 'https://en.wikipedia.org/w/api.php'
@@ -14,6 +15,8 @@ REF_API_URL = REST_API_URL + 'page/references/%s/%s'  # TODO
 
 
 def format_datetime(dt):
+    if isinstance(dt, datetime.date):
+        dt = datetime.datetime(dt.year, dt.month, dt.day, 0, 0, 0)
     return dt.isoformat().split('.')[0] + 'Z'
 
 
@@ -48,7 +51,7 @@ def get_wikidata_item(pta):
 ##
 
 def get_json(url, params=None):  # TODO: option for validating status code
-    print(url, params)
+    print('  ', url, params)
     resp = requests.get(url, params=params)
     return resp.json()
 
@@ -119,7 +122,10 @@ def _get_assessments(title):
               'formatversion': 2,
               'format': 'json'}
     resp = get_json(MW_API_URL, params)
-    return resp['query']['pages'][0]['pageassessments']
+    try:
+        return resp['query']['pages'][0]['pageassessments']
+    except KeyError:
+        return []
 
 
 def check_infobox(template_calls):
