@@ -43,7 +43,8 @@ RUN_UUID = uuid.uuid4()
 
 DEBUG = False
 
-ASHES_ENV = AshesEnv(TEMPLATE_PATH)
+
+ASHES_ENV = AshesEnv(TEMPLATE_PATH, filters={'percentage': lambda n: round(n*100, 2)})
 ASHES_ENV.load_all()
 
 
@@ -294,6 +295,7 @@ class PTCampaign(object):
     id = attr.ib(validator=validate_campaign_id)
     name = attr.ib()
     lang = attr.ib()
+    description = attr.ib()
     contacts = attr.ib()
     wikiproject_name = attr.ib()
     campaign_start_date = attr.ib()
@@ -400,14 +402,17 @@ class PTCampaign(object):
         ctx = {'id': self.id,
                'name': self.name,
                'lang': self.lang,
+               'description': self.description,
                'contacts': self.contacts,
                'wikiproject_name': self.wikiproject_name,
                'campaign_start_date': self.campaign_start_date.isoformat(),
                'campaign_end_date': self.campaign_end_date.isoformat(),
                'date_created': self.date_created.isoformat(),
+               'date_updated': datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%s'),
                'goals': self.goals,
-               'start_state_overall': self.start_state.overall_results,
-               'latest_state_overall': self.latest_state.overall_results,
+               'article_count': len(self.article_title_list),
+               'start_state_overall': [{'name': k, 'result': v} for k, v in self.start_state.overall_results.items()],
+               'latest_state_overall': [{'name': k, 'result': v} for k, v in self.latest_state.overall_results.items()],
         }
         report_html = ASHES_ENV.render('campaign.html', ctx)
         report_path = STATIC_PATH + ('campaigns/%s/index.html' % self.id)
@@ -427,7 +432,6 @@ class PTCampaign(object):
         self.record_state()  # defults to now
         self.load_latest_state()
         self.render_report()
-
 
 
 def get_argparser():

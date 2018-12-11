@@ -1,9 +1,74 @@
-<html>
-  <head>
-<title>Campaign</title>
-</head>
-<body>
-  <h1>Campaign</h1>
-  <pre>{.|ppjson} </pre>
-</body>
+<!DOCTYPE html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>PaceTrack</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/css/bootstrap.min.css">
+        <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/css/bootstrap-theme.min.css">
+        <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/font-awesome/4.2.0/css/font-awesome.min.css">
+
+    </head>
+
+    <body class="bg-light">
+
+    <nav class="navbar navbar-light bg-dark">
+        <div class="container">
+            <a class="navbar-brand text-light" href="#"><i class="fa fa-car"></i> PaceTrack</a>
+
+            <ul class="nav justify-content-end text-light">
+              <li class="nav-item">
+                <a class="nav-link text-light" href="#"><i class="fa fa-book"></i> About</a>
+              </li>
+            </ul>
+        </div>
+    </nav>
+    
+    <!-- Campaigns -->
+    
+    <div class="container">
+        <div class="my-3 p-3 bg-white rounded shadow-sm">
+        <h1 class="border-bottom border-gray">{name}</h1>
+        <p class="lead">{campaign_start_date} -- {campaign_end_date}</p>
+        <p>{description}</p>
+        <ul>
+            <li>Wikiproject: <a href="https://{lang}.wikipedia.org/wiki/Wikipedia:{wikiproject_name}">{wikiproject_name}</a></li>
+            <li>Articles: {article_count}</li>
+            <li>Organized by: {#contacts}<a href="#">{.}</a>{/contacts}</li>
+            <li>Last updated: {date_updated}</li>
+        </ul>
+        <p><a href="#" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a> <a href="#" class="btn btn-outline-primary">Article list</a></p>
+        <p></p>
+    </div>
+</div>
+    <div class="container">
+
+        {#latest_state_overall}
+
+        <div class="row mb-1">
+            <div class="col-3">
+                <h5>{result.name}</h5> 
+            </div>
+            <div class="col-9">
+                {@ne key=result.not_done_count value=0}<p>{result.not_done_count} article{@ne key=result.not_done_count value=1}s{/ne} left to improve</a></p>{/ne}
+            </div>
+        </div>
+        <div class="row pb-2 mb-5">
+            <div class="col-12"><div class="progress">
+                    <!-- <div class="progress-bar" style="width: 5%"></div> -->
+                    <div class="progress-bar progress-bar" style="width: {result.progress|percentage}%">{result.progress|percentage}%</div>
+                </div>
+            </div>
+        </div>
+
+
+        {/latest_state_overall}
+
+    </div>
+
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/js/bootstrap.min.js"></script>
+    </body>
 </html>

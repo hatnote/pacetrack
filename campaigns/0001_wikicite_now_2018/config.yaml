@@ -4,6 +4,7 @@
 id: "wikicite_now_2018"
 name: "WikiCite NoW 2018"
 lang: en
+description: "A project to improve Wikipedia's coverage of newspapers."
 contacts:
   - "User:Peteforsyth"
 wikiproject_name: "WikiProject_Newspapers"
