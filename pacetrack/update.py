@@ -29,7 +29,7 @@ from boltons.iterutils import unique, partition, first
 from boltons.timeutils import isoparse
 
 from log import tlog, set_debug
-from metrics import (get_revid, get_templates, get_talk_templates,
+from metrics import (get_revid, get_talk_revid, get_templates, get_talk_templates,
                      get_assessments, get_wikiprojects, get_citations,
                      get_wikidata_item)
 
@@ -63,6 +63,7 @@ class PTArticle(object):
 
     rev_id = attr.ib(default=None)
     talk_rev_id = attr.ib(default=None, repr=False)
+    title = attr.ib(default=None)
 
     content = attr.ib(default=attr.Factory(list), repr=False)
     assessments = attr.ib(default=attr.Factory(list), repr=False)
@@ -77,11 +78,19 @@ class PTArticle(object):
 
 
 def ref_count(pta):
-    return len(pta.citations)
+    return len(pta.citations['references_by_id'].keys())
 
 
 def wikidata_item(pta):
     return len(pta.wikidata_item)
+
+
+def in_wikiproject(pta, wikiproject=None, case_sensitive=False):
+    wikiprojects = pta.wikiprojects
+    if not case_sensitive:
+        wikiprojects = unique([w.lower() for w in wikiprojects])
+        wikiproject = wikiproject.lower()
+    return wikiproject in wikiprojects
 
 
 def template_count(pta, template_name=None, template_regex=None, case_sensitive=False):
@@ -103,7 +112,7 @@ def eval_one_article_goal(goal, pta):
     target_val = goal['target']['value']
     cmp_name = goal['target'].get('cmp', 'ge')
     if cmp_name == 'bool':
-        return bool(metric_val)
+        return {'done': bool(metric_val)}
     cmp_func = getattr(operator, cmp_name, None)
     ret['cur'] = metric_val
     ret['target'] = target_val
@@ -209,7 +218,9 @@ class PTCampaignState(object):
         article_list = []
         for title in campaign.article_title_list:
             pta = PTArticle(lang=campaign.lang, title=title, timestamp=timestamp)
+            pta.talk_title = 'Talk:' + title
             pta.rev_id = get_revid(pta)
+            pta.talk_rev_id = get_talk_revid(pta)
 
             if pta.rev_id:
                 pta.templates = get_templates(pta)
@@ -228,7 +239,6 @@ class PTCampaignState(object):
         for goal in campaign.goals:
             key = slugify(goal['name'])
             target_ratio = float(goal.get('ratio', 1.0))
-
             results = [a.results[key]['done'] for a in article_list]
             # TODO: average/median metric value
 
@@ -375,30 +385,6 @@ class PTCampaign(object):
         start_state.save()
         return
 
-    def to_json(self):
-        # In progress...
-        # Should include more from config
-        report = {'save': {'date': datetime.datetime.utcnow().isoformat()},
-                  'overall_results': self.overall_results,
-                  'article_results': [{'title': art.title, "results": art.results}
-                                      for art in self.article_list]}
-        return json.dumps(report, indent=2, sort_keys=True)
-
-    def save(self):
-        "output timestamped json file to campaign_dir/data/_timestamp_.json"
-        timestamp = datetime.datetime.utcnow().strftime('%Y%m%d%H%M%s')
-        # Use a different filename for debug/test?
-        out_path = self.base_path + '/data/' + timestamp + '.json'
-        json_report = self.to_json()
-        try:
-            out_file = open(out_path, 'w')
-        except IOError:
-            mkdir_p(os.path.dirname(out_path))
-            out_file = open(out_path, 'w')
-        with out_file:
-            out_file.write(json_report)
-        return
-
     def render_report(self):
         ctx = {'id': self.id,
                'name': self.name,
@@ -422,6 +408,31 @@ class PTCampaign(object):
             f.write(report_html)
         return
 
+    def render_article_list(self):
+        latest = []
+        for article in self.latest_state.specific_results:
+            results = sorted(article['results'].items())
+            res = {'title': article['title'],
+                    'results': [r[1] for r in results]}
+            latest.append(res)
+        ctx = {'name': self.name,
+               'lang': self.lang,
+               'description': self.description,
+               'contacts': self.contacts,
+               'wikiproject_name': self.wikiproject_name,
+               'campaign_start_date': self.campaign_start_date.isoformat(),
+               'campaign_end_date': self.campaign_end_date.isoformat(),
+               'date_created': self.date_created.isoformat(),
+               'date_updated': datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%s'),
+               'article_count': len(self.article_title_list),
+               'latest': latest,
+               'goals': [{'name': 'Article'}] + sorted(self.goals, key=lambda s: s['name'])}
+        article_list_html = ASHES_ENV.render('articles.html', ctx)
+        article_list_path = STATIC_PATH + ('campaigns/%s/articles.html' % self.id)
+        mkdir_p(os.path.split(article_list_path)[0])
+        with atomic_save(article_list_path) as f:
+            f.write(article_list_html)
+        return
 
     def load_latest_state(self):
         self.latest_state = PTCampaignState.from_latest(self)
@@ -433,6 +444,7 @@ class PTCampaign(object):
         self.record_state()  # defults to now
         self.load_latest_state()
         self.render_report()
+        self.render_article_list()
 
 
 def get_argparser():

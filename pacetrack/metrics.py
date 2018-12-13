@@ -23,6 +23,10 @@ def format_datetime(dt):
 def get_revid(pta):
     return _get_revid_at_timestamp(pta.title, format_datetime(pta.timestamp))
 
+def get_talk_revid(pta):
+        return _get_revid_at_timestamp(pta.talk_title, format_datetime(pta.timestamp))
+
+
 
 def get_templates(pta):
     return _get_templates(pta.rev_id)

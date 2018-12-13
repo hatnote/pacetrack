@@ -7,7 +7,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/css/bootstrap.min.css">
-        <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/css/bootstrap-theme.min.css">
+        <link rel="stylesheet" href="https://cdn.datatables.net/1.10.19/css/dataTables.bootstrap4.min.css"> <!-- not available via cdnjs -->
         <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/font-awesome/4.2.0/css/font-awesome.min.css">
 
     </head>
@@ -29,7 +29,8 @@
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="#">Home</a></li>
-        <li class="breadcrumb-item active" aria-current="page">{name}</a></li>
+        <li class="breadcrumb-item"><a href="index.html">{name}</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Articles</li>
       </ol>
     </nav>
     
@@ -46,38 +47,39 @@
             <li>Organized by: {#contacts}<a href="#">{.}</a>{/contacts}</li>
             <li>Last updated: {date_updated}</li>
         </ul>
-        <p><a href="articles.html" class="btn btn-outline-primary">Article list</a> <a href="#" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a></p>
+        <p><a href="index.html" class="btn btn-outline-primary">Campaign overview</a> <a href="#" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a></p>
         <p></p>
-    </div>
-</div>
-    <div class="container">
 
-        {#latest_state_overall}
-
-        <div class="row mb-1">
-            <div class="col-3">
-                <h5>{result.name}</h5> 
-            </div>
-            <div class="col-9">
-                {@ne key=result.not_done_count value=0}<p>{result.not_done_count} article{@ne key=result.not_done_count value=1}s{/ne} left to improve</a></p>{/ne}
-            </div>
-        </div>
-        <div class="row pb-2 mb-5">
-            <div class="col-12"><div class="progress">
-                    <!-- <div class="progress-bar" style="width: 5%"></div> -->
-                    <div class="progress-bar progress-bar" style="width: {result.progress|percentage}%">{result.progress|percentage}%</div>
-                </div>
-            </div>
-        </div>
-
-
-        {/latest_state_overall}
-
-        {.|pp_json}
+        <table class="table" id="articles">
+            <thead>
+                <tr>
+                    {#goals}
+                    <th scope="col">{name}</th>
+                    {/goals}
+                </tr>
+            </thead>
+            <tbody>
+                {#latest}
+                <tr>
+                    <th scope="row"><a href="https://{lang}.wikipedia.org/wiki/{title}">{title}</a></th>
+                    {#results}
+                    {?done}<td class="table-success">Yes{?.target} ({cur}/{target}){/target}</td>{:else}<td class="table-danger">No{?target} ({cur}/{target}){/target}</td>{/done}
+                    {/results}
+                </tr>
+                {/latest}
+            </tbody>
+        </table>
 
     </div>
 
-    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/datatables/1.10.19/js/jquery.dataTables.min.js"></script>
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/datatables/1.10.19/js/dataTables.bootstrap4.min.js"></script>
     <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/js/bootstrap.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#articles').DataTable();
+        } );
+        </script>
     </body>
 </html>

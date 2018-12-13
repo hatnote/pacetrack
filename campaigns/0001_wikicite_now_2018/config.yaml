@@ -27,10 +27,26 @@ goals:
       cmp: eq  # gt, ge, lt, le, eq, ne, bool  (default ge)
       ratio: 1.0  # 100% coverage
       # total: 500  # 500 articles, mutually exclusive with above
+  - name: "In Wikiproject Newspapers"
+    metric: in_wikiproject
+    metric_args:
+      wikiproject: Newspapers
+      case_sensitive: False
+    target:
+      value: 1
+      cmp: bool
+  - name: "In Wikiproject Journalism"
+    metric: in_wikiproject
+    metric_args:
+      wikiproject: Journalism
+      case_sensitive: False
+    target:
+      value: 1
+      cmp: bool
   - name: "Citation count"
     metric: ref_count
     target:
-      value: 2
+      value: 10
       ratio: 1.0
   - name: "Exists on Wikidata"
     metric: wikidata_item
