@@ -47,10 +47,10 @@
             <li>Organized by: {#contacts}<a href="#">{.}</a>{/contacts}</li>
             <li>Last updated: {date_updated}</li>
         </ul>
-        <p><a href="index.html" class="btn btn-outline-primary">Campaign overview</a> <a href="#" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a></p>
+        <p><a href="index.html" class="btn btn-primary">Campaign overview</a> <a href="#" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a></p>
         <p></p>
-
-        <table class="table" id="articles">
+        <h2>Article list</h2>
+        <table class="table hover" id="articles">
             <thead>
                 <tr>
                     {#goals}
@@ -63,7 +63,7 @@
                 <tr>
                     <th scope="row"><a href="https://{lang}.wikipedia.org/wiki/{title}">{title}</a></th>
                     {#results}
-                    {?done}<td class="table-success">Yes{?.target} ({cur}/{target}){/target}</td>{:else}<td class="table-danger">No{?target} ({cur}/{target}){/target}</td>{/done}
+                    {?done}<td class="table-success"{?cur}data-order="{cur}"{/cur}>Yes{?target} ({cur}/{target}){/target}</td>{:else}<td class="table-danger"{?cur}data-order="{cur}"{/cur}>No{?target} ({cur}/{target}){/target}</td>{/done}
                     {/results}
                 </tr>
                 {/latest}

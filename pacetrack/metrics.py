@@ -8,6 +8,7 @@ import datetime
 
 import requests
 
+from six.moves.urllib.parse import quote_plus
 
 MW_API_URL = 'https://en.wikipedia.org/w/api.php'
 REST_API_URL = 'https://en.wikipedia.org/api/rest_v1/'
@@ -158,6 +159,7 @@ def get_wikiproject(wikiproject, talk_revid):
 
 
 def _get_citations(title, old_id):
+    title = quote_plus(title.replace(' ', '_').encode('utf-8'))  # API does not support urlencoded space
     api_url = REF_API_URL % (title, old_id)
 
     citations = get_json(api_url)

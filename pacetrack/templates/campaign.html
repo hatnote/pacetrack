@@ -46,34 +46,45 @@
             <li>Organized by: {#contacts}<a href="#">{.}</a>{/contacts}</li>
             <li>Last updated: {date_updated}</li>
         </ul>
-        <p><a href="articles.html" class="btn btn-outline-primary">Article list</a> <a href="#" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a></p>
+        <p><a href="articles.html" class="btn btn-primary">Article list</a> <a href="#" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a></p>
         <p></p>
     </div>
 </div>
     <div class="container">
 
-        {#latest_state_overall}
+        {#combined_state}
 
-        <div class="row mb-1">
-            <div class="col-3">
-                <h5>{result.name}</h5> 
-            </div>
-            <div class="col-9">
-                {@ne key=result.not_done_count value=0}<p>{result.not_done_count} article{@ne key=result.not_done_count value=1}s{/ne} left to improve</a></p>{/ne}
-            </div>
-        </div>
-        <div class="row pb-2 mb-5">
-            <div class="col-12"><div class="progress">
+        <div class="my-3 p-3 bg-white rounded shadow-sm">
+            <h3>{latest.result.name}</h3>
+            <div class="row">
+                <div class="col-1">
+                    <h5>Start:</h5>
+                </div>
+                <div class="col-11">
+                    <div class="progress">
                     <!-- <div class="progress-bar" style="width: 5%"></div> -->
-                    <div class="progress-bar progress-bar" style="width: {result.progress|percentage}%">{result.progress|percentage}%</div>
+                        <div class="progress-bar progress-bar-striped bg-warning" style="width: {start.result.progress|percentage}%">{start.result.progress|percentage}%</div>
+                    </div>
                 </div>
             </div>
+            <div class="row">
+                <div class="col-1">
+                    <h5>Now:</h5>
+                </div>
+
+                <div class="col-11">
+                    <div class="progress">
+                    <!-- <div class="progress-bar" style="width: 5%"></div> -->
+                        <div class="progress-bar progress-bar" style="width: {latest.result.progress|percentage}%">{latest.result.progress|percentage}%</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                {@ne key=latest.result.not_done_count value=0}<p>{latest.result.not_done_count} article{@ne key=latest.result.not_done_count value=1}s{/ne} left to improve.</p>{/ne}
+            </div>
         </div>
 
-
-        {/latest_state_overall}
-
-        {.|pp_json}
+        {/combined_state}
 
     </div>
 

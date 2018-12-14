@@ -386,6 +386,13 @@ class PTCampaign(object):
         return
 
     def render_report(self):
+        start_state = [{'name': k, 'result': v} for k, v in self.start_state.overall_results.items()]
+        start_state.sort(key=lambda g: g['name'])
+        latest_state = [{'name': k, 'result': v} for k, v in self.latest_state.overall_results.items()]
+        latest_state.sort(key=lambda g: g['name'])
+        combined = [{'start': s[0], 'latest': s[1]} for s in zip(start_state, latest_state)]
+        # TODO: Also combine goals, so you can show info about targets, etc.
+
         ctx = {'id': self.id,
                'name': self.name,
                'lang': self.lang,
@@ -398,8 +405,9 @@ class PTCampaign(object):
                'date_updated': datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%s'),
                'goals': self.goals,
                'article_count': len(self.article_title_list),
-               'start_state_overall': [{'name': k, 'result': v} for k, v in self.start_state.overall_results.items()],
-               'latest_state_overall': [{'name': k, 'result': v} for k, v in self.latest_state.overall_results.items()],
+               'start_state_overall': start_state,
+               'latest_state_overall': latest_state,
+               'combined_state': combined
         }
         report_html = ASHES_ENV.render('campaign.html', ctx)
         report_path = STATIC_PATH + ('campaigns/%s/index.html' % self.id)
@@ -431,7 +439,7 @@ class PTCampaign(object):
         article_list_path = STATIC_PATH + ('campaigns/%s/articles.html' % self.id)
         mkdir_p(os.path.split(article_list_path)[0])
         with atomic_save(article_list_path) as f:
-            f.write(article_list_html)
+            f.write(article_list_html.encode('utf-8'))
         return
 
     def load_latest_state(self):
