@@ -10,6 +10,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 
 import os
+import re
 import sys
 import json
 import uuid
@@ -19,6 +20,7 @@ import traceback
 from time import strftime
 from pipes import quote as shell_quote
 from argparse import ArgumentParser
+from itertools import izip_longest
 
 import attr
 from ruamel import yaml
@@ -32,6 +34,7 @@ from log import tlog, set_debug
 from metrics import (get_revid, get_talk_revid, get_templates, get_talk_templates,
                      get_assessments, get_wikiprojects, get_citations,
                      get_wikidata_item)
+
 
 CUR_PATH = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_PATH = CUR_PATH + '/templates/'
@@ -77,12 +80,40 @@ class PTArticle(object):
     results = attr.ib(default=None, repr=False)
 
 
+def article_exists(pta):
+    if not pta.rev_id:
+        return False
+    return True
+
+
 def ref_count(pta):
+    if not pta.citations:
+        return 0
     return len(pta.citations['references_by_id'].keys())
+
+
+def ref_wikidata_count(pta):
+    if not pta.citations:
+        return 0
+    return len([c for c in pta.citations['references_by_id'].items()
+                if 'https://www.wikidata.org/wiki/Q'
+                in c[1]['content']['html']])
 
 
 def wikidata_item(pta):
     return len(pta.wikidata_item)
+
+
+def assessment_avg(pta, scale=None, wikiproject=None):
+    # TODO
+    """assessments = pta.assessments.items()
+    if wikiproject:
+        assessments = [(p, a) for p, a in assessment if p == wikiproject]
+    if scale:
+        pass
+    import pdb;pdb.set_trace()
+    """
+    pass
 
 
 def in_wikiproject(pta, wikiproject=None, case_sensitive=False):
@@ -95,12 +126,14 @@ def in_wikiproject(pta, wikiproject=None, case_sensitive=False):
 
 def template_count(pta, template_name=None, template_regex=None, case_sensitive=False):
     tmpl_names = pta.templates
+    if template_regex:
+        template_pattern = re.compile(template_regex)
+        return len([t for t in tmpl_names if re.search(template_pattern, t)])
     if not case_sensitive:
         tmpl_names = unique([t.lower() for t in tmpl_names])
         template_name = template_name.lower()
     if not template_name:
         return len(tmpl_names)
-    # TODO: regex support
     return len([t for t in tmpl_names if template_name in t])
 
 
@@ -124,7 +157,6 @@ def eval_one_article_goal(goal, pta):
 
     remaining = 0.0 if done else target_val - metric_val
     ret['remaining'] = remaining
-
     progress = (metric_val - start_val) / (target_val - start_val)
     ret['progress'] = progress
 
@@ -314,6 +346,7 @@ class PTCampaign(object):
     goals = attr.ib(repr=False)
     article_list_config = attr.ib(repr=False)
 
+    disabled = attr.ib(default=False, repr=False)
     article_title_list = attr.ib(default=None, repr=False)
     start_state = attr.ib(default=None, repr=False)
     latest_state = attr.ib(default=None, repr=False)  # populate with load_latest_state()
@@ -369,6 +402,11 @@ class PTCampaign(object):
             title_key = alc['title_key']
             article_list = [e[title_key] for e in json_data]
             self.article_title_list = article_list
+        elif alc['type'] == 'yaml_file':
+            yaml_file_path = self.base_path + '/' + alc['path']
+            title_key = alc['title_key']
+            article_list = yaml.safe_load(open(yaml_file_path, 'rb')).get(title_key)
+            self.article_title_list = article_list
         else:
             raise ValueError('expected supported article list type, not %r' % (alc['type'],))
         return
@@ -390,7 +428,7 @@ class PTCampaign(object):
         start_state.sort(key=lambda g: g['name'])
         latest_state = [{'name': k, 'result': v} for k, v in self.latest_state.overall_results.items()]
         latest_state.sort(key=lambda g: g['name'])
-        combined = [{'start': s[0], 'latest': s[1]} for s in zip(start_state, latest_state)]
+        combined = [{'start': s[0], 'latest': s[1]} for s in izip_longest(start_state, latest_state)]
         # TODO: Also combine goals, so you can show info about targets, etc.
 
         ctx = {'id': self.id,
@@ -473,6 +511,9 @@ def process_one(campaign_dir):
     # output timestamped json file to campaign_dir/data/_timestamp_.json
     # generate static pages
     pt = PTCampaign.from_path(campaign_dir)
+    if pt.disabled:
+        print('Skipping %s' % pt.name)
+        return pt
     # TODO: if data doesn't exist for the campaign's start date, just
     # automatically populate it before doing the current time.
     print(pt)
