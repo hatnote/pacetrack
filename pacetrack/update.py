@@ -22,6 +22,9 @@ from pipes import quote as shell_quote
 from argparse import ArgumentParser
 from itertools import izip_longest
 
+import urllib3
+urllib3.disable_warnings()  # for labs
+
 import attr
 from ruamel import yaml
 from ashes import AshesEnv
