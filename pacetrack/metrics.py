@@ -6,13 +6,15 @@ from __future__ import print_function
 import re
 import datetime
 
+from hyperlink import parse as parse_url
 import requests
 
-from six.moves.urllib.parse import quote_plus
 
-MW_API_URL = 'https://en.wikipedia.org/w/api.php'
-REST_API_URL = 'https://en.wikipedia.org/api/rest_v1/'
-REF_API_URL = REST_API_URL + 'page/references/%s/%s'  # TODO
+MW_API_URL = parse_url('https://en.wikipedia.org/w/api.php')
+REST_API_BASE_URL = parse_url('https://en.wikipedia.org/api/rest_v1/')
+REF_API_BASE_URL = REST_API_BASE_URL.child('page', 'references')
+
+from log import tlog
 
 
 def format_datetime(dt):
@@ -56,9 +58,17 @@ def get_wikidata_item(pta):
 ##
 
 def get_json(url, params=None):  # TODO: option for validating status code
-    print('  ', url, params)
+    params = dict(params or {})
+    for k, v in params.items():
+        url = url.set(unicode(k), unicode(v))
+    print(unicode(url))
     resp = requests.get(url, params=params)
     return resp.json()
+
+
+def get_wapi_json(params):
+    url = MW_API_URL
+    return get_json(url, params)
 
 
 def _get_revid_at_timestamp(title, timestamp):
@@ -70,7 +80,7 @@ def _get_revid_at_timestamp(title, timestamp):
     :return: a map from page title to the revision id
 
     """
-    resp = get_json(MW_API_URL, params={
+    resp = get_wapi_json(params={
         'action': 'query',
         'prop': 'revisions',
         'format': 'json',
@@ -93,7 +103,7 @@ def _get_templates(oldid):
     :param oldid:
     :return: a list of
     """
-    revisionResponse = get_json(MW_API_URL, params={
+    revisionResponse = get_wapi_json(params={
         'action': 'parse',
         'oldid': oldid,
         'format': 'json',
@@ -109,7 +119,7 @@ def _get_article_wikidata_item(oldid):
               'prop': 'wbentityusage',
               'revids': oldid,
               'format': 'json'}
-    resp = get_json(MW_API_URL, params)
+    resp = get_wapi_json(params)
     try:
         wbentities = resp['query']['pages'].values()[0]['wbentityusage']
     except KeyError as e:
@@ -126,7 +136,7 @@ def _get_assessments(title):
               'titles': title,
               'formatversion': 2,
               'format': 'json'}
-    resp = get_json(MW_API_URL, params)
+    resp = get_wapi_json(params)
     try:
         return resp['query']['pages'][0]['pageassessments']
     except KeyError:
@@ -159,8 +169,8 @@ def get_wikiproject(wikiproject, talk_revid):
 
 
 def _get_citations(title, old_id):
-    title = quote_plus(title.replace(' ', '_').encode('utf-8'))  # API does not support urlencoded space
-    api_url = REF_API_URL % (title, old_id)
+    title = title.replace(' ', '_')  # rest endpoint doesn't like url encoded spaces
+    api_url = REF_API_BASE_URL.child(title, unicode(old_id))
 
     citations = get_json(api_url)
 

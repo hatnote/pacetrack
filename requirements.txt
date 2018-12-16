@@ -1,6 +1,12 @@
+ashes==17.0.0
 attrs==18.2.0
 boltons==18.0.1
+certifi==2018.11.29
+chardet==3.0.4
+hyperlink==18.0.0
+idna==2.7
 lithoxyl==0.4.3
+requests==2.20.1
 ruamel.ordereddict==0.4.13
 ruamel.yaml==0.15.80
-requests==2.20.1
+urllib3==1.24.1
