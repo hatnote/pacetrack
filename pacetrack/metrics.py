@@ -130,7 +130,7 @@ def _get_assessments(title):
     try:
         return resp['query']['pages'][0]['pageassessments']
     except KeyError:
-        return []
+        return {}
 
 
 def check_infobox(template_calls):
