@@ -282,9 +282,9 @@ class PTCampaignState(object):
                 async_pta_update(pta, {'templates': get_templates,
                                        'talk_templates': get_talk_templates,
                                        'assessments': get_assessments,
-                                       'wikiprojects': get_wikiprojects,
                                        'citations': get_citations,
                                        'wikidata_item': get_wikidata_item})
+                pta.wikiprojects = get_wikiprojects(pta)  # relies on templates (no network)
 
             pta.results = eval_article_goals(campaign.goals, pta)
 
