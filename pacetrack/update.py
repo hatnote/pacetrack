@@ -29,8 +29,9 @@ from boltons.strutils import slugify
 from boltons.fileutils import atomic_save, iter_find_files, mkdir_p
 from boltons.iterutils import unique, partition, first
 from boltons.timeutils import isoparse
+from tqdm import tqdm
 
-from log import tlog, set_debug
+from log import tlog, set_debug, LOG_PATH
 from metrics import (get_revid, get_talk_revid, get_templates, get_talk_templates,
                      get_assessments, get_wikiprojects, get_citations,
                      get_wikidata_item)
@@ -248,7 +249,15 @@ class PTCampaignState(object):
                   specific_results=None)
 
         article_list = []
-        for title in campaign.article_title_list:
+        article_title_list = campaign.article_title_list
+
+        base_desc = 'Scanning %s @ %s' % (campaign.name, timestamp.isoformat().split('.')[0])
+        article_title_list = tqdm(article_title_list,
+                                  desc=base_desc,
+                                  disable=None,  # autodisable on non-tty
+                                  unit='article')
+        for title in article_title_list:
+            article_title_list.set_description(base_desc + ' ({:16.16})'.format(title))
             pta = PTArticle(lang=campaign.lang, title=title, timestamp=timestamp)
             pta.talk_title = 'Talk:' + title
             pta.rev_id = get_revid(pta)
@@ -363,16 +372,21 @@ class PTCampaign(object):
 
         ret = cls(**kwargs)
 
-        try:
-            start_state = PTCampaignState.from_timestamp(ret, ret.campaign_start_date)
-        except StateNotFound as snf:
-            if not auto_start_state:
-                raise
-            print('start state not found (got %r), backfilling...' % snf)
-            ret.load_article_list()
-            start_state = PTCampaignState.from_api(ret, ret.campaign_start_date)
-            start_state.save()
-            print('backfilling complete')
+        needs_backfill = False
+        with tlog.info('load_start_state') as _act:
+            try:
+                start_state = PTCampaignState.from_timestamp(ret, ret.campaign_start_date)
+            except StateNotFound as snf:
+                if not auto_start_state:
+                    raise
+                needs_backfill = True
+                _act.failure('start state not found (got {0!r}), backfilling...', snf)
+
+        if needs_backfill:
+            with tlog.critical('backfill_start_state', verbose=True):
+                ret.load_article_list()
+                start_state = PTCampaignState.from_api(ret, ret.campaign_start_date)
+                start_state.save()
 
         ret.start_state = start_state
 
@@ -388,7 +402,8 @@ class PTCampaign(object):
         """
         pass
 
-    def load_article_list(self):
+    @tlog.wrap('critical', inject_as='_act')
+    def load_article_list(self, _act):
         """
         # TODO: add sparql query and wikiproject support
         article_list_filename = config_data.pop('article_list', "article_list.yaml")
@@ -402,11 +417,15 @@ class PTCampaign(object):
             title_key = alc['title_key']
             article_list = [e[title_key] for e in json_data]
             self.article_title_list = article_list
+            _act['path'] = json_file_path
+            _act.success('successfully loaded sparql query json at {path}')
         elif alc['type'] == 'yaml_file':
             yaml_file_path = self.base_path + '/' + alc['path']
             title_key = alc['title_key']
             article_list = yaml.safe_load(open(yaml_file_path, 'rb')).get(title_key)
             self.article_title_list = article_list
+            _act['path'] = yaml_file_path
+            _act.success('successfully loaded yaml at {path}')
         else:
             raise ValueError('expected supported article list type, not %r' % (alc['type'],))
         return
@@ -416,11 +435,13 @@ class PTCampaign(object):
         data for charting or pace calculation"""
         pass
 
-    def record_state(self, timestamp=None):
+    @tlog.wrap('critical', inject_as='_act', verbose=True)
+    def record_state(self, timestamp=None, _act=None):
         if not timestamp:
             timestamp = datetime.datetime.utcnow()
-        start_state = PTCampaignState.from_api(self, timestamp)
-        start_state.save()
+        _act['timestamp'] = timestamp
+        state = PTCampaignState.from_api(self, timestamp)
+        state.save()
         return
 
     def render_report(self):
@@ -510,14 +531,16 @@ def process_one(campaign_dir):
     # fetch data
     # output timestamped json file to campaign_dir/data/_timestamp_.json
     # generate static pages
-    pt = PTCampaign.from_path(campaign_dir)
-    if pt.disabled:
-        print('Skipping %s' % pt.name)
-        return pt
+    with tlog.critical('load_campaign_dir', path=campaign_dir) as _act:
+        pt = PTCampaign.from_path(campaign_dir)
+        _act['name'] = pt.name
+        if pt.disabled:
+            _act.failure("campaign {name!r} disabled, skipping.")
+            return pt
     # TODO: if data doesn't exist for the campaign's start date, just
     # automatically populate it before doing the current time.
-    print(pt)
-    pt.update()
+    with tlog.critical('update_campaign', name=pt.name, verbose=True):
+        pt.update()
     print()
     print('Results:')
     for res in pt.latest_state.specific_results:
@@ -539,6 +562,7 @@ def process_all():
 @tlog.wrap('critical')
 def main():
     tlog.critical('start').success('started {0}', os.getpid())
+    print('   -> logging to %s' % LOG_PATH)
     parser = get_argparser()
     args = parser.parse_args()
 

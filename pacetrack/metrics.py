@@ -57,11 +57,13 @@ def get_wikidata_item(pta):
 
 ##
 
-def get_json(url, params=None):  # TODO: option for validating status code
+@tlog.wrap('info', inject_as='act')
+def get_json(url, params=None, act=None):  # TODO: option for validating status code
     params = dict(params or {})
     for k, v in params.items():
         url = url.set(unicode(k), unicode(v))
-    print(unicode(url))
+    if act:
+        act['url'] = unicode(url)
     resp = requests.get(url, params=params)
     return resp.json()
 

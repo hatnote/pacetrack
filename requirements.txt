@@ -9,4 +9,6 @@ lithoxyl==0.4.3
 requests==2.20.1
 ruamel.ordereddict==0.4.13
 ruamel.yaml==0.15.80
+six==1.12.0
+tqdm==4.28.1
 urllib3==1.24.1
