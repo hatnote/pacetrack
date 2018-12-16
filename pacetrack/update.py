@@ -31,6 +31,9 @@ from boltons.iterutils import unique, partition, first
 from boltons.timeutils import isoparse
 from tqdm import tqdm
 
+import gevent.monkey
+gevent.monkey.patch_all()
+
 from log import tlog, set_debug, LOG_PATH
 from metrics import (get_revid, get_talk_revid, get_templates, get_talk_templates,
                      get_assessments, get_wikiprojects, get_citations,
@@ -256,20 +259,29 @@ class PTCampaignState(object):
                                   desc=base_desc,
                                   disable=None,  # autodisable on non-tty
                                   unit='article')
+
+        def async_pta_update(pta, attr_func_map):
+            jobs = []
+            for attr, func in attr_func_map.items():
+                cur = gevent.spawn(lambda pta=pta, attr=attr, func=func: setattr(pta, attr, func(pta)))
+                jobs.append(cur)
+            gevent.wait(jobs, timeout=20)
+            return
+
         for title in article_title_list:
             article_title_list.set_description(base_desc + ' ({:16.16})'.format(title))
             pta = PTArticle(lang=campaign.lang, title=title, timestamp=timestamp)
             pta.talk_title = 'Talk:' + title
-            pta.rev_id = get_revid(pta)
-            pta.talk_rev_id = get_talk_revid(pta)
+            async_pta_update(pta, {'rev_id': get_revid,
+                                   'talk_rev_id': get_talk_revid})
 
             if pta.rev_id:
-                pta.templates = get_templates(pta)
-                pta.talk_templates = get_talk_templates(pta)
-                pta.assessments = get_assessments(pta)
-                pta.wikiprojects = get_wikiprojects(pta)
-                pta.citations = get_citations(pta)
-                pta.wikidata_item = get_wikidata_item(pta)
+                async_pta_update(pta, {'templates': get_templates,
+                                       'talk_templates': get_talk_templates,
+                                       'assessments': get_assessments,
+                                       'wikiprojects': get_wikiprojects,
+                                       'citations': get_citations,
+                                       'wikidata_item': get_wikidata_item})
 
             pta.results = eval_article_goals(campaign.goals, pta)
 
