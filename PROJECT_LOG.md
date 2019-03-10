@@ -8,8 +8,11 @@
 * favicon
 * Link to start revision in article list table
 * Fix Last Updated date (microseconds)
-* Debug occasional 'parse' keyerror (probably article title missing from wikipedia)
 * Why do we have two Sun-Times?
-* Save log to static
+
 
 ## Complete
+
+* Debug occasional 'parse' keyerror
+   * Missing talk page
+* update.log in each campaign's `static` folder
