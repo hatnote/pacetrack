@@ -8,27 +8,25 @@ PROJECT_PATH = os.path.dirname(CUR_PATH)
 LOG_PATH = PROJECT_PATH + '/pacetrack.log'
 
 
-class FixedFileEmitter(FileEmitter):
-    def __init__(self, filepath, encoding=None, **kwargs):
-        self.encoding = encoding
-        super(FixedFileEmitter, self).__init__(filepath, encoding, **kwargs)
-
-
-
-
-
 tlog = Logger('pacetrack')
-
 file_fmt = SensibleFormatter('{status_char}{iso_end_notz} - {duration_s}s - {action_name} - {end_message}',
-                             begin='{status_char}{iso_begin_notz} - {action_name} - {begin_message}')
-file_emt = FixedFileEmitter(LOG_PATH)
-file_filter = SensibleFilter(success='info',
-                             failure='debug',
-                             exception='debug')
-file_sink = SensibleSink(formatter=file_fmt,
-                         emitter=file_emt,
-                         filters=[file_filter])
-tlog.add_sink(file_sink)
+                             begin='{status_char}{iso_begin_notz} -   --   - {action_name} - {begin_message}')
+
+
+def build_stream_sink(stream):
+    emt = StreamEmitter(stream)
+    file_filter = SensibleFilter(success='info',
+                                 failure='debug',
+                                 exception='debug')
+    file_sink = SensibleSink(formatter=file_fmt,
+                             emitter=emt,
+                             filters=[file_filter])
+    return file_sink
+
+
+
+default_file_sink = build_stream_sink(open(LOG_PATH, 'a'))
+tlog.add_sink(default_file_sink)
 
 
 stdout_fmt = file_fmt

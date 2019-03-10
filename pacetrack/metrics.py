@@ -28,7 +28,7 @@ def get_revid(pta):
 
 
 def get_talk_revid(pta):
-        return _get_revid_at_timestamp(pta.talk_title, format_datetime(pta.timestamp))
+    return _get_revid_at_timestamp(pta.talk_title, format_datetime(pta.timestamp))
 
 
 def get_templates(pta):
@@ -105,13 +105,19 @@ def _get_templates(oldid):
     :param oldid:
     :return: a list of
     """
+    if not oldid:
+        return []
     revisionResponse = get_wapi_json(params={
         'action': 'parse',
         'oldid': oldid,
         'format': 'json',
     })
 
-    templates = revisionResponse['parse']['templates']
+    try:
+        templates = revisionResponse['parse']['templates']
+    except KeyError:
+        import pdb;pdb.post_mortem()
+        raise
     ret = [t['*'].replace('Template:', '') for t in templates]
     return ret
 
@@ -161,6 +167,8 @@ def check_infobox_wikidata(template_calls):
 
 
 def get_wikiproject(wikiproject, talk_revid):
+    if not talk_revid:
+        return False
     talk_templates = _get_templates(talk_revid)
     wikiprojects = [tc.replace('WikiProject ', '')  for tc in talk_templates
                     if 'wikiproject' in tc.lower()]
@@ -210,7 +218,7 @@ def get_all_stats(title, wikiproject, date):
     templates = _get_templates(revid)
     assessments = _get_assessments(title)
 
-    stats = {'wikipedia_exists': revid,
+    stats = {'wikipedia_exists': bool(revid),
              'wikidata_exists': _get_article_wikidata_item(revid),
              'infobox': check_infobox(templates),
              'infobox_wikidata': check_infobox_wikidata(templates),
@@ -218,6 +226,7 @@ def get_all_stats(title, wikiproject, date):
              'in_wikiproject': get_wikiproject(wikiproject, talk_revid),
              'quality': assessments.get(wikiproject, {}).get('class'),
              'importance': assessments.get(wikiproject, {}).get('importance'),
+             'wikipedia_talk_exists': bool(talk_revid),
              'metadata': {'target_date': date,
                           'revision': revid,
                           'talk_revision': talk_revid}}

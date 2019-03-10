@@ -37,7 +37,7 @@ from tqdm import tqdm
 import gevent.monkey
 gevent.monkey.patch_all()
 
-from log import tlog, set_debug, LOG_PATH
+from log import tlog, set_debug, LOG_PATH, build_stream_sink
 from metrics import (get_revid, get_talk_revid, get_templates, get_talk_templates,
                      get_assessments, get_wikiprojects, get_citations,
                      get_wikidata_item)
@@ -266,7 +266,8 @@ class PTCampaignState(object):
         def async_pta_update(pta, attr_func_map):
             jobs = []
             for attr, func in attr_func_map.items():
-                cur = gevent.spawn(lambda pta=pta, attr=attr, func=func: setattr(pta, attr, func(pta)))
+                _debug_log_func = tlog.wrap('debug')(func)
+                cur = gevent.spawn(lambda pta=pta, attr=attr, func=_debug_log_func: setattr(pta, attr, func(pta)))
                 jobs.append(cur)
             gevent.wait(jobs, timeout=20)
             return
@@ -521,12 +522,22 @@ class PTCampaign(object):
 
     def update(self):
         "does it all"
-        self.load_article_list()
-        self.load_latest_state()
-        self.record_state()  # defults to now
-        self.load_latest_state()
-        self.render_report()
-        self.render_article_list()
+        final_update_log_path = STATIC_PATH + 'campaigns/%s/update.log' % self.id
+        with atomic_save(final_update_log_path) as f:
+            cur_update_sink = build_stream_sink(f)
+            old_sinks = tlog.sinks
+            tlog.set_sinks(old_sinks + [cur_update_sink])
+            try:
+                with tlog.info('campaign update', id=self.id, log_path=final_update_log_path, verbose=True):
+                    self.load_article_list()
+                    self.load_latest_state()
+                    self.record_state()  # defults to now
+                    self.load_latest_state()
+                    self.render_report()
+                    self.render_article_list()
+            finally:
+                tlog.set_sinks(old_sinks)
+        return
 
 
 def get_argparser():
