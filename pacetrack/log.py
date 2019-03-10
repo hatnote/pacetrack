@@ -19,8 +19,8 @@ class FixedFileEmitter(FileEmitter):
 
 tlog = Logger('pacetrack')
 
-file_fmt = SensibleFormatter('{parent_depth_indent}{status_char}{iso_end_notz} - {duration_s}s - {action_name} - {end_message}',
-                             begin='{parent_depth_indent}{status_char}{iso_begin_notz} - {action_name} - {begin_message}')
+file_fmt = SensibleFormatter('{status_char}{iso_end_notz} - {duration_s}s - {action_name} - {end_message}',
+                             begin='{status_char}{iso_begin_notz} - {action_name} - {begin_message}')
 file_emt = FixedFileEmitter(LOG_PATH)
 file_filter = SensibleFilter(success='info',
                              failure='debug',
