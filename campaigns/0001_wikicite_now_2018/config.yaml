@@ -15,7 +15,7 @@ date_created: 2018-11-29
 article_list:
   # defaults to article_list.yaml, this is from sparql json output
   type: "sparql_json_file"
-  path: "query_med.json"
+  path: "query_selma.json"
   title_key: "page_titleEN"
 goals:
   - name: "Has Newspaper Infobox"

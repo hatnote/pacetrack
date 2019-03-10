@@ -33,9 +33,9 @@
         <li class="breadcrumb-item active" aria-current="page">Articles</li>
       </ol>
     </nav>
-    
+
     <!-- Campaigns -->
-    
+
     <div class="container">
         <div class="my-3 p-3 bg-white rounded shadow-sm">
         <h1 class="border-bottom border-gray">{name}</h1>
@@ -59,14 +59,14 @@
                 </tr>
             </thead>
             <tbody>
-                {#latest}
+                {#all_results}
                 <tr>
-                    <th scope="row"><a href="https://{lang}.wikipedia.org/wiki/{title}">{title}</a></th>
+                    <th scope="row"><a href="https://{lang}.wikipedia.org/wiki/{title|u}">{title}</a></th>
                     {#results}
                     {?done}<td class="table-success"{?cur}data-order="{cur}"{/cur}>Yes{?target} ({cur}/{target}){/target}</td>{:else}<td class="table-danger"{?cur}data-order="{cur}"{/cur}>No{?target} ({cur}/{target}){/target}</td>{/done}
                     {/results}
                 </tr>
-                {/latest}
+                {/all_results}
             </tbody>
         </table>
 

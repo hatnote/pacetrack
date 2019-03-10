@@ -33,6 +33,7 @@ from boltons.fileutils import atomic_save, iter_find_files, mkdir_p
 from boltons.iterutils import unique, partition, first
 from boltons.timeutils import isoparse
 from tqdm import tqdm
+from glom import glom, T
 
 import gevent.monkey
 gevent.monkey.patch_all()
@@ -50,6 +51,7 @@ CAMPAIGNS_PATH = PROJECT_PATH + '/campaigns/'
 STATIC_PATH = PROJECT_PATH + '/static/'
 
 RUN_UUID = uuid.uuid4()
+UPDATED_DT_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 DEBUG = False
 
@@ -190,6 +192,20 @@ class PTCampaignState(object):
     specific_results = attr.ib(default=None, repr=False)
     article_list = attr.ib(default=None, repr=False)
     _state_file_save_date = attr.ib(default=None)
+
+    def get_results_struct(self):
+        result_spec = {
+            'title': 'title',
+            'rev_id': 'rev_id',
+            'talk_rev_id': 'talk_rev_id',
+            'results': (T['results'].items(), sorted, [T[1]]),
+        }
+        # Note: results (above) is being sorted by key to line up with the
+        # goals in the results template.
+
+        ret = glom(self.specific_results, [result_spec])
+
+        return ret
 
     @property
     def is_start_state(self):
@@ -477,7 +493,7 @@ class PTCampaign(object):
                'campaign_start_date': self.campaign_start_date.isoformat(),
                'campaign_end_date': self.campaign_end_date.isoformat(),
                'date_created': self.date_created.isoformat(),
-               'date_updated': datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%s'),
+               'date_updated': datetime.datetime.utcnow().strftime(UPDATED_DT_FORMAT),
                'goals': self.goals,
                'article_count': len(self.article_title_list),
                'start_state_overall': start_state,
@@ -491,13 +507,16 @@ class PTCampaign(object):
             f.write(report_html)
         return
 
+    def _get_all_results(self):
+        ret = self.latest_state.get_results_struct()
+        start = self.start_state.get_results_struct()
+        _title_start_map = dict([(r['title'], r) for r in start])
+        for res in ret:
+            res['start'] = _title_start_map.get(res['title'])
+        return ret
+
     def render_article_list(self):
-        latest = []
-        for article in self.latest_state.specific_results:
-            results = sorted(article['results'].items())
-            res = {'title': article['title'],
-                    'results': [r[1] for r in results]}
-            latest.append(res)
+        all_results = self._get_all_results()
         ctx = {'name': self.name,
                'lang': self.lang,
                'description': self.description,
@@ -508,13 +527,16 @@ class PTCampaign(object):
                'date_created': self.date_created.isoformat(),
                'date_updated': datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%s'),
                'article_count': len(self.article_title_list),
-               'latest': latest,
+               'all_results': all_results,
                'goals': [{'name': 'Article'}] + sorted(self.goals, key=lambda s: s['name'])}
+        campaign_static_path = STATIC_PATH + 'campaigns/%s/' % self.id
         article_list_html = ASHES_ENV.render('articles.html', ctx)
-        article_list_path = STATIC_PATH + ('campaigns/%s/articles.html' % self.id)
+        article_list_path = campaign_static_path + 'articles.html'
+        article_list_json_path = campaign_static_path + 'articles.json'
         mkdir_p(os.path.split(article_list_path)[0])
-        with atomic_save(article_list_path) as f:
-            f.write(article_list_html.encode('utf-8'))
+        with atomic_save(article_list_path) as html_f, atomic_save(article_list_json_path) as json_f:
+            html_f.write(article_list_html.encode('utf-8'))
+            json.dump(ctx, json_f, indent=2, sort_keys=True)
         return
 
     def load_latest_state(self):
