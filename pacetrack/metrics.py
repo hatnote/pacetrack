@@ -104,7 +104,7 @@ def in_wikiproject(pta, wikiproject=None, case_sensitive=False):
     return wikiproject in wikiprojects
 
 
-def template_count(pta, template_name=None, template_regex=None, case_sensitive=False):
+def template_count(pta, template_name=None, template_names=None, template_regex=None, case_sensitive=False):
     tmpl_names = pta.templates
     if template_regex:
         template_pattern = re.compile(template_regex)
@@ -112,9 +112,13 @@ def template_count(pta, template_name=None, template_regex=None, case_sensitive=
     if not case_sensitive:
         tmpl_names = unique([t.lower() for t in tmpl_names])
         template_name = template_name.lower()
-    if not template_name:
+    if template_name and template_names:
+        raise RuntimeError('template_count metric expected one of "template_name" or "template_names" arg, not both')
+    if template_name:
+        template_names = [template_name]
+    if not template_names:
         return len(tmpl_names)
-    return len([t for t in tmpl_names if template_name in t])
+    return len(set(template_names) & set(tmpl_names))
 
 ##
 

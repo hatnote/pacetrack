@@ -2,7 +2,6 @@
 
 ## Backlog
 
-* Make has_template metric take multiple templates
 * Home page
   * List of campaigns
   * Button to file PR
@@ -34,6 +33,7 @@
 
 ## Complete
 
+* Make has_template metric take multiple templates
 * Debug occasional 'parse' keyerror
    * Missing talk page
 * update.log in each campaign's `static` folder
