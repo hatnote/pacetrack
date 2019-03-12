@@ -10,7 +10,6 @@
 * favicon
 * Link to start revision in article list table
 * Why do we have two Sun-Times?
-* Add metric "desc" field to go with "name"
 * Show goal criteria from metric config
 * Link to update.log from the campaign
 * Run hourly, keep one per day
@@ -36,6 +35,9 @@
 
 ## Complete
 
+* Add goal "desc" field to go with "name"
+  * Integrated into campaign overview
+  * Also integrated into column tooltip on article list
 * Compress full json (.json.gz, you'll need to refetch)
 * Rename:
    * "overall_results" -> "goal_results"

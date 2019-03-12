@@ -32,9 +32,9 @@
         <li class="breadcrumb-item active" aria-current="page">{name}</a></li>
       </ol>
     </nav>
-    
+
     <!-- Campaigns -->
-    
+
     <div class="container">
         <div class="my-3 p-3 bg-white rounded shadow-sm">
         <h1 class="border-bottom border-gray">{name}</h1>
@@ -55,7 +55,8 @@
         {#combined_state}
 
         <div class="my-3 p-3 bg-white rounded shadow-sm">
-            <h3>{latest.result.name}</h3>
+          <h3>{latest.result.name}</h3>
+          {?latest.result.desc}<p><i>{latest.result.desc}</i></p>{/latest.result.desc}
             <div class="row">
                 <div class="col-1">
                     <h5>Start:</h5>

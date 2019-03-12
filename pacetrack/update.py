@@ -273,6 +273,7 @@ class PTCampaignState(object):
                          'target_ratio': target_ratio,
                          'key': key,
                          'name': goal['name'],
+                         'desc': goal.get('desc'),
                          'progress': ratio / target_ratio,
                          'done': ratio >= target_ratio}
 

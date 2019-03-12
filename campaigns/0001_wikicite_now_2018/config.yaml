@@ -19,6 +19,7 @@ article_list:
   title_key: "page_titleEN"
 goals:
   - name: "Has Newspaper Infobox"
+    desc: "Get exactly one newspaper or magazine infobox on every article"
     metric: template_count
     metric_args:
       template_name: Infobox Newspaper
