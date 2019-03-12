@@ -18,8 +18,6 @@
 * Generate home page from the campaign.json (cached campaign progress)
 * update_frequency campaign configuration field (allows scaling up to megaprojects and down to editathon)
 * "This campaign ended ..." banner
-* Data format version
-* Data migration tool
 
 ### Deployment
 
@@ -31,6 +29,12 @@
 * rerender subcommand
 * clear cached data subcommand
 
+### Future
+
+* Data format version
+* Data migration tool
+* Allow goal renaming by recording the metric + metric args instead of
+  the goal name? or maybe just have goal id.
 
 
 ## Complete
