@@ -2,8 +2,9 @@
 
 ## Backlog
 
-* Home page
+* Frontend: Home page
   * List of campaigns
+  * Campaign progress (backend: provide number of completed goals)
   * Button to file PR
 * Pull Request Template
 * favicon
@@ -19,6 +20,13 @@
 * Generate home page from the campaign.json (cached campaign progress)
 * update_frequency campaign configuration field (allows scaling up to megaprojects and down to editathon)
 * "This campaign ended ..." banner
+* Rename:
+   * "overall_results" -> "goal_results"
+   * "specific_results" -> "article_results"
+   * Will require refetching
+   * To clarify campaign_results are more like overall_results
+* Data format version
+* Data migration tool
 
 ### Deployment
 
@@ -33,6 +41,7 @@
 
 ## Complete
 
+* campaign_results in state data
 * Make has_template metric take multiple templates
 * Debug occasional 'parse' keyerror
    * Missing talk page

@@ -6,8 +6,7 @@
   Update script to load data for tracked wikiproject campaigns
 
 """
-from __future__ import unicode_literals
-from __future__ import print_function
+from __future__ import unicode_literals, print_function, division
 
 import os
 import re
@@ -131,6 +130,7 @@ class StateNotFound(Exception):
 class PTCampaignState(object):
     campaign = attr.ib()
     timestamp = attr.ib()
+    campaign_results = attr.ib()
     overall_results = attr.ib(repr=False)
     specific_results = attr.ib(default=None, repr=False)
     article_list = attr.ib(default=None, repr=False)
@@ -160,8 +160,12 @@ class PTCampaignState(object):
         with open(json_path, 'rb') as f:
             state_data = json.load(f)
 
+        campaign_results = state_data.get('campaign_results')
+        if not campaign_results:
+            print('WARNING: old data, no campaign results present, delete data and reupdate')
         ret = cls(campaign=campaign,
                   timestamp=isoparse(state_data['timestamp']),
+                  campaign_results=campaign_results,
                   overall_results=state_data['overall_results'],
                   specific_results=state_data['specific_results'] if full else None,
                   # title_list=state_data['title_list'],  # no use for this yet
@@ -210,6 +214,7 @@ class PTCampaignState(object):
         timestamp = timestamp if timestamp is not None else datetime.datetime.utcnow()
         ret = cls(campaign=campaign,
                   timestamp=timestamp,
+                  campaign_results=None,
                   overall_results=None,
                   specific_results=None)
 
@@ -270,6 +275,12 @@ class PTCampaignState(object):
                          'name': goal['name'],
                          'progress': ratio / target_ratio,
                          'done': ratio >= target_ratio}
+
+        ret.campaign_results = glom(ores, {'done_count': (T.values(), ['done_count'], sum),
+                                           'not_done_count': (T.values(), ['not_done_count'], sum),
+                                           'total_count': (T.values(), ['total_count'], sum)})
+        ret.campaign_results['ratio'] = ret.campaign_results['done_count'] / ret.campaign_results['total_count']
+
         ret.overall_results = ores
         ret.specific_results = [attr.asdict(a) for a in article_list]
         return ret
@@ -287,6 +298,7 @@ class PTCampaignState(object):
         result_data = {'campaign_name': self.campaign.name,
                        'timestamp': self.timestamp,
                        'save_date': save_timestamp,
+                       'campaign_results': self.campaign_results,
                        'overall_results': self.overall_results,
                        'title_list': self.campaign.article_title_list}
         with atomic_save(result_path) as f:
