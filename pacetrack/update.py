@@ -39,9 +39,7 @@ import gevent.monkey
 gevent.monkey.patch_all()
 
 from log import tlog, set_debug, LOG_PATH, build_stream_sink
-from metrics import (get_revid, get_talk_revid, get_templates, get_talk_templates,
-                     get_assessments, get_wikiprojects, get_citations,
-                     get_wikidata_item)
+import metrics
 
 
 CUR_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -89,66 +87,11 @@ class PTArticle(object):
     results = attr.ib(default=None, repr=False)
 
 
-def article_exists(pta):
-    if not pta.rev_id:
-        return False
-    return True
-
-
-def ref_count(pta):
-    if not pta.citations:
-        return 0
-    return len(pta.citations['references_by_id'].keys())
-
-
-def ref_wikidata_count(pta):
-    if not pta.citations:
-        return 0
-    return len([c for c in pta.citations['references_by_id'].items()
-                if 'https://www.wikidata.org/wiki/Q'
-                in c[1]['content']['html']])
-
-
-def wikidata_item(pta):
-    return len(pta.wikidata_item)
-
-
-def assessment_avg(pta, scale=None, wikiproject=None):
-    # TODO
-    """assessments = pta.assessments.items()
-    if wikiproject:
-        assessments = [(p, a) for p, a in assessment if p == wikiproject]
-    if scale:
-        pass
-    import pdb;pdb.set_trace()
-    """
-    pass
-
-
-def in_wikiproject(pta, wikiproject=None, case_sensitive=False):
-    wikiprojects = pta.wikiprojects
-    if not case_sensitive:
-        wikiprojects = unique([w.lower() for w in wikiprojects])
-        wikiproject = wikiproject.lower()
-    return wikiproject in wikiprojects
-
-
-def template_count(pta, template_name=None, template_regex=None, case_sensitive=False):
-    tmpl_names = pta.templates
-    if template_regex:
-        template_pattern = re.compile(template_regex)
-        return len([t for t in tmpl_names if re.search(template_pattern, t)])
-    if not case_sensitive:
-        tmpl_names = unique([t.lower() for t in tmpl_names])
-        template_name = template_name.lower()
-    if not template_name:
-        return len(tmpl_names)
-    return len([t for t in tmpl_names if template_name in t])
-
-
-def eval_one_article_goal(goal, pta):
+def eval_one_article_goal(pta, goal):
     ret = {}
-    metric_func = globals()[goal['metric']]
+    metric_func = getattr(metrics, goal['metric'], None)
+    if metric_func is None:
+        raise RuntimeError('unexpected metric name: %r' % goal['metric'])
     metric_args = goal.get('metric_args', {})
     metric_val = metric_func(pta, **metric_args)
     target_val = goal['target']['value']
@@ -172,11 +115,11 @@ def eval_one_article_goal(goal, pta):
     return ret
 
 
-def eval_article_goals(goals, pta):
+def eval_article_goals(pta, goals):
     ret = {}
     for goal in goals:
         # maybe default name to metric name, need to precheck they don't collide
-        ret[slugify(goal['name'])] = eval_one_article_goal(goal, pta)
+        ret[slugify(goal['name'])] = eval_one_article_goal(pta, goal)
     return ret
 
 
@@ -292,18 +235,18 @@ class PTCampaignState(object):
             article_title_list.set_description(base_desc + ' ({:16.16})'.format(title))
             pta = PTArticle(lang=campaign.lang, title=title, timestamp=timestamp)
             pta.talk_title = 'Talk:' + title
-            async_pta_update(pta, {'rev_id': get_revid,
-                                   'talk_rev_id': get_talk_revid})
+            async_pta_update(pta, {'rev_id': metrics.get_revid,
+                                   'talk_rev_id': metrics.get_talk_revid})
 
             if pta.rev_id:
-                async_pta_update(pta, {'templates': get_templates,
-                                       'talk_templates': get_talk_templates,
-                                       'assessments': get_assessments,
-                                       'citations': get_citations,
-                                       'wikidata_item': get_wikidata_item})
-                pta.wikiprojects = get_wikiprojects(pta)  # relies on templates (no network)
+                async_pta_update(pta, {'templates': metrics.get_templates,
+                                       'talk_templates': metrics.get_talk_templates,
+                                       'assessments': metrics.get_assessments,
+                                       'citations': metrics.get_citations,
+                                       'wikidata_item': metrics.get_wikidata_item})
+                pta.wikiprojects = metrics.get_wikiprojects(pta)  # relies on templates (no network)
 
-            pta.results = eval_article_goals(campaign.goals, pta)
+            pta.results = eval_article_goals(pta, campaign.goals)
 
             article_list.append(pta)
         ret.article_list = article_list
@@ -525,7 +468,7 @@ class PTCampaign(object):
                'campaign_start_date': self.campaign_start_date.isoformat(),
                'campaign_end_date': self.campaign_end_date.isoformat(),
                'date_created': self.date_created.isoformat(),
-               'date_updated': datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%s'),
+               'date_updated': datetime.datetime.utcnow().strftime(UPDATED_DT_FORMAT),
                'article_count': len(self.article_title_list),
                'all_results': all_results,
                'goals': [{'name': 'Article'}] + sorted(self.goals, key=lambda s: s['name'])}
@@ -553,7 +496,7 @@ class PTCampaign(object):
                 with tlog.info('campaign update', id=self.id, log_path=final_update_log_path, verbose=True):
                     self.load_article_list()
                     self.load_latest_state()
-                    self.record_state()  # defults to now
+                    self.record_state()  # defaults to now
                     self.load_latest_state()
                     self.render_report()
                     self.render_article_list()

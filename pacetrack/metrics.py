@@ -6,6 +6,7 @@ from __future__ import print_function
 import re
 import datetime
 
+from boltons.iterutils import unique
 from hyperlink import parse as parse_url
 import requests
 
@@ -21,6 +22,9 @@ def format_datetime(dt):
     if isinstance(dt, datetime.date):
         dt = datetime.datetime(dt.year, dt.month, dt.day, 0, 0, 0)
     return dt.isoformat().split('.')[0] + 'Z'
+
+
+## PTArticle-based Metrics
 
 
 def get_revid(pta):
@@ -54,6 +58,63 @@ def get_citations(pta):
 
 def get_wikidata_item(pta):
     return _get_article_wikidata_item(pta.rev_id)
+
+
+def article_exists(pta):
+    if not pta.rev_id:
+        return False
+    return True
+
+
+def ref_count(pta):
+    if not pta.citations:
+        return 0
+    return len(pta.citations['references_by_id'].keys())
+
+
+def ref_wikidata_count(pta):
+    if not pta.citations:
+        return 0
+    return len([c for c in pta.citations['references_by_id'].items()
+                if 'https://www.wikidata.org/wiki/Q'
+                in c[1]['content']['html']])
+
+
+def wikidata_item(pta):
+    return len(pta.wikidata_item)
+
+
+def assessment_avg(pta, scale=None, wikiproject=None):
+    # TODO
+    """assessments = pta.assessments.items()
+    if wikiproject:
+        assessments = [(p, a) for p, a in assessment if p == wikiproject]
+    if scale:
+        pass
+    import pdb;pdb.set_trace()
+    """
+    pass
+
+
+def in_wikiproject(pta, wikiproject=None, case_sensitive=False):
+    wikiprojects = pta.wikiprojects
+    if not case_sensitive:
+        wikiprojects = unique([w.lower() for w in wikiprojects])
+        wikiproject = wikiproject.lower()
+    return wikiproject in wikiprojects
+
+
+def template_count(pta, template_name=None, template_regex=None, case_sensitive=False):
+    tmpl_names = pta.templates
+    if template_regex:
+        template_pattern = re.compile(template_regex)
+        return len([t for t in tmpl_names if re.search(template_pattern, t)])
+    if not case_sensitive:
+        tmpl_names = unique([t.lower() for t in tmpl_names])
+        template_name = template_name.lower()
+    if not template_name:
+        return len(tmpl_names)
+    return len([t for t in tmpl_names if template_name in t])
 
 ##
 
