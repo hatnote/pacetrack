@@ -1,3 +1,5 @@
+static/campaigns/*
+campaigns/*/data/*
 
 *.py[cod]
 .DS_Store
@@ -37,4 +39,3 @@ nosetests.xml
 
 # Translations
 *.mo
-
