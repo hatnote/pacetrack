@@ -12,12 +12,14 @@
 * Why do we have two Sun-Times?
 * Show goal criteria from metric config
 * Link to update.log from the campaign
-* Run hourly, keep one per day
 * "More info" cell for article list
 * /static/campaign_name/campaign.json
-* Generate home page from the campaign.json (cached campaign progress)
-* update_frequency campaign configuration field (allows scaling up to megaprojects and down to editathon)
+* frequency campaign configuration field
+   * fetch_frequency
+   * save_frequency - Run hourly, keep one per day
+   * Allows scaling up to megaprojects (fetch daily) and down to editathon (fetch every 10 minutes)
 * "This campaign ended ..." banner
+* Base home.html off of cached campaign.json files.
 
 ### Deployment
 
@@ -39,6 +41,7 @@
 
 ## Complete
 
+* Generate campaign.json (cached campaign progress)
 * Add goal "desc" field to go with "name"
   * Integrated into campaign overview
   * Also integrated into column tooltip on article list

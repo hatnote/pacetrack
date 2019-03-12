@@ -460,11 +460,14 @@ class PTCampaign(object):
                'latest_state_goal': latest_state,
                'combined_state': combined
         }
+        campaign_static_path = STATIC_PATH + 'campaigns/%s/' % self.id
+        mkdir_p(campaign_static_path)
         report_html = ASHES_ENV.render('campaign.html', ctx)
-        report_path = STATIC_PATH + ('campaigns/%s/index.html' % self.id)
-        mkdir_p(os.path.split(report_path)[0])
-        with atomic_save(report_path) as f:
-            f.write(report_html)
+        report_path = campaign_static_path + 'index.html'
+        report_json_path = campaign_static_path + 'campaign.json'
+        with atomic_save(report_path) as html_f, atomic_save(report_json_path) as json_f:
+            html_f.write(report_html)
+            json.dump(ctx, json_f, indent=2, sort_keys=True)
         return
 
     def _get_all_results(self):
