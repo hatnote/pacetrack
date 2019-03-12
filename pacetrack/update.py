@@ -9,14 +9,12 @@
 from __future__ import unicode_literals, print_function, division
 
 import os
-import re
 import sys
+import gzip
 import json
 import uuid
 import datetime
 import operator
-import traceback
-from time import strftime
 from pipes import quote as shell_quote
 from argparse import ArgumentParser
 from itertools import izip_longest
@@ -131,8 +129,8 @@ class PTCampaignState(object):
     campaign = attr.ib()
     timestamp = attr.ib()
     campaign_results = attr.ib()
-    overall_results = attr.ib(repr=False)
-    specific_results = attr.ib(default=None, repr=False)
+    goal_results = attr.ib(repr=False)
+    article_results = attr.ib(default=None, repr=False)
     article_list = attr.ib(default=None, repr=False)
     _state_file_save_date = attr.ib(default=None)
 
@@ -146,7 +144,7 @@ class PTCampaignState(object):
         # Note: results (above) is being sorted by key to line up with the
         # goals in the results template.
 
-        ret = glom(self.specific_results, [result_spec])
+        ret = glom(self.article_results, [result_spec])
 
         return ret
 
@@ -158,6 +156,8 @@ class PTCampaignState(object):
     @classmethod
     def from_json_path(cls, campaign, json_path, full):
         with open(json_path, 'rb') as f:
+            if json_path.endswith('.gz'):
+                f = gzip.GzipFile(fileobj=f)
             state_data = json.load(f)
 
         campaign_results = state_data.get('campaign_results')
@@ -166,8 +166,8 @@ class PTCampaignState(object):
         ret = cls(campaign=campaign,
                   timestamp=isoparse(state_data['timestamp']),
                   campaign_results=campaign_results,
-                  overall_results=state_data['overall_results'],
-                  specific_results=state_data['specific_results'] if full else None,
+                  goal_results=state_data['goal_results'],
+                  article_results=state_data['article_results'] if full else None,
                   # title_list=state_data['title_list'],  # no use for this yet
                   state_file_save_date=state_data['save_date'])
         return ret
@@ -182,7 +182,7 @@ class PTCampaignState(object):
         latest_dir = data_base_dir + sorted(data_dirs)[-1]
 
         if full:
-            pattern = 'state_full_*.json'
+            pattern = 'state_full_*.json.gz'
         else:
             pattern = 'state_*.json'
 
@@ -194,7 +194,7 @@ class PTCampaignState(object):
     def from_timestamp(cls, campaign, timestamp, full=True):
         # TODO: support for hour/minute when present in timestamp
         if full:
-            strf_tmpl = '/data/%Y%m/state_full_%Y%m%d_*.json'
+            strf_tmpl = '/data/%Y%m/state_full_%Y%m%d_*.json.gz'
         else:
             strf_tmpl = '/data/%Y%m/state_%Y%m%d_*.json'
 
@@ -215,8 +215,8 @@ class PTCampaignState(object):
         ret = cls(campaign=campaign,
                   timestamp=timestamp,
                   campaign_results=None,
-                  overall_results=None,
-                  specific_results=None)
+                  goal_results=None,
+                  article_results=None)
 
         article_list = []
         article_title_list = campaign.article_title_list
@@ -256,7 +256,7 @@ class PTCampaignState(object):
             article_list.append(pta)
         ret.article_list = article_list
 
-        ores = {}  # overall results
+        gres = {}  # goal results
         for goal in campaign.goals:
             key = slugify(goal['name'])
             target_ratio = float(goal.get('ratio', 1.0))
@@ -266,7 +266,7 @@ class PTCampaignState(object):
             done, not_done = partition(results)
             # TODO: need to integrate start state for progress tracking
             ratio = 1.0 if not not_done else float(len(done)) / len(article_list)
-            ores[key] = {'done_count': len(done),
+            gres[key] = {'done_count': len(done),
                          'not_done_count': len(not_done),
                          'total_count': len(article_list),
                          'ratio': ratio,
@@ -276,19 +276,19 @@ class PTCampaignState(object):
                          'progress': ratio / target_ratio,
                          'done': ratio >= target_ratio}
 
-        ret.campaign_results = glom(ores, {'done_count': (T.values(), ['done_count'], sum),
+        ret.campaign_results = glom(gres, {'done_count': (T.values(), ['done_count'], sum),
                                            'not_done_count': (T.values(), ['not_done_count'], sum),
                                            'total_count': (T.values(), ['total_count'], sum)})
         ret.campaign_results['ratio'] = ret.campaign_results['done_count'] / ret.campaign_results['total_count']
 
-        ret.overall_results = ores
-        ret.specific_results = [attr.asdict(a) for a in article_list]
+        ret.goal_results = gres
+        ret.article_results = [attr.asdict(a) for a in article_list]
         return ret
 
     def save(self):
         """save to campaign_dir/data/YYYYMM/state_YYMMDD_HHMMSS.json
         and campaign_dir/data/YYYYMM/state_full_YYMMDD_HHMMSS.json"""
-        if not self.overall_results or not self.specific_results:
+        if not self.goal_results or not self.article_results:
             raise RuntimeError('only intended to be called after a full results population with from_api()')
         save_timestamp = datetime.datetime.utcnow().isoformat()
 
@@ -299,15 +299,19 @@ class PTCampaignState(object):
                        'timestamp': self.timestamp,
                        'save_date': save_timestamp,
                        'campaign_results': self.campaign_results,
-                       'overall_results': self.overall_results,
+                       'goal_results': self.goal_results,
                        'title_list': self.campaign.article_title_list}
         with atomic_save(result_path) as f:
             json.dump(result_data, f, indent=2, sort_keys=True, default=str)
 
-        full_result_path = self.campaign.base_path + self.timestamp.strftime('/data/%Y%m/state_full_%Y%m%d_%H%M%S.json')
-        result_data['specific_results'] = [attr.asdict(a) for a in self.article_list]
+        full_result_fn = self.timestamp.strftime('state_full_%Y%m%d_%H%M%S.json')
+        full_result_fn_gz = full_result_fn + '.gz'
+        full_result_path = self.campaign.base_path + self.timestamp.strftime('/data/%Y%m/') + full_result_fn_gz
+        result_data['article_results'] = [attr.asdict(a) for a in self.article_list]
         with atomic_save(full_result_path) as f:
-            json.dump(result_data, f, default=str)
+            gzf = gzip.GzipFile(filename=full_result_fn, fileobj=f)
+            json.dump(result_data, gzf, default=str)
+            gzf.close()
 
         return
 
@@ -432,9 +436,9 @@ class PTCampaign(object):
         return
 
     def render_report(self):
-        start_state = [{'name': k, 'result': v} for k, v in self.start_state.overall_results.items()]
+        start_state = [{'name': k, 'result': v} for k, v in self.start_state.goal_results.items()]
         start_state.sort(key=lambda g: g['name'])
-        latest_state = [{'name': k, 'result': v} for k, v in self.latest_state.overall_results.items()]
+        latest_state = [{'name': k, 'result': v} for k, v in self.latest_state.goal_results.items()]
         latest_state.sort(key=lambda g: g['name'])
         combined = [{'start': s[0], 'latest': s[1]} for s in izip_longest(start_state, latest_state)]
         # TODO: Also combine goals, so you can show info about targets, etc.
@@ -451,8 +455,8 @@ class PTCampaign(object):
                'date_updated': datetime.datetime.utcnow().strftime(UPDATED_DT_FORMAT),
                'goals': self.goals,
                'article_count': len(self.article_title_list),
-               'start_state_overall': start_state,
-               'latest_state_overall': latest_state,
+               'start_state_goal': start_state,
+               'latest_state_goal': latest_state,
                'combined_state': combined
         }
         report_html = ASHES_ENV.render('campaign.html', ctx)
@@ -545,12 +549,12 @@ def process_one(campaign_dir):
     with tlog.critical('update_campaign', name=pt.name, verbose=True):
         pt.update()
     print()
-    print('Results:')
-    for res in pt.latest_state.specific_results:
-        print('  ', (res['title'], res['results']))
-    print()
-    print('Overall results:')
-    for key, results in pt.latest_state.overall_results.items():
+    #print('Results:')
+    #for res in pt.latest_state.article_results:
+    #    print('  ', (res['title'], res['results']))
+    #print()
+    print('Goal results:')
+    for key, results in pt.latest_state.goal_results.items():
         print(' - {name}  ({done_count}/{total_count})  Done: {done}'.format(**results))
     print()
     return pt

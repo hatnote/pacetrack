@@ -13,18 +13,12 @@
 * Add metric "desc" field to go with "name"
 * Show goal criteria from metric config
 * Link to update.log from the campaign
-* Compress full json
 * Run hourly, keep one per day
 * "More info" cell for article list
 * /static/campaign_name/campaign.json
 * Generate home page from the campaign.json (cached campaign progress)
 * update_frequency campaign configuration field (allows scaling up to megaprojects and down to editathon)
 * "This campaign ended ..." banner
-* Rename:
-   * "overall_results" -> "goal_results"
-   * "specific_results" -> "article_results"
-   * Will require refetching
-   * To clarify campaign_results are more like overall_results
 * Data format version
 * Data migration tool
 
@@ -36,11 +30,18 @@
 * update-all subcommand
 * update-schedule subcommand
 * rerender subcommand
+* clear cached data subcommand
 
 
 
 ## Complete
 
+* Compress full json (.json.gz, you'll need to refetch)
+* Rename:
+   * "overall_results" -> "goal_results"
+   * "specific_results" -> "article_results"
+   * Will require refetching
+   * To clarify campaign_results are more like overall_results
 * campaign_results in state data
 * Make has_template metric take multiple templates
 * Debug occasional 'parse' keyerror
