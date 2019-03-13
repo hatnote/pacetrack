@@ -557,11 +557,23 @@ def process_one(campaign_dir):
     return pt
 
 
-def process_all():
-    for campaign_dir in os.listdir(CAMPAIGNS_PATH):
-        if not campaign_dir.startswith('.'):
-            cur_pt = process_one(CAMPAIGNS_PATH + campaign_dir)
-    # import pdb;pdb.set_trace()
+def get_all_campaign_dirs(abspath=True):
+    # TODO: check for config.yaml in the directory?
+    ret = [CAMPAIGNS_PATH + cd if abspath else cd for cd in os.listdir(CAMPAIGNS_PATH) if not cd.startswith('.')]
+    return ret
+
+
+def update_all():
+    "Update all campaigns configured"
+    for campaign_dir in get_all_campaign_dirs():
+        cur_pt = process_one(campaign_dir)
+    return
+
+
+def list_campaigns():
+    print('\n'.join(get_all_campaign_dirs(abspath=False)))
+
+
 
 @tlog.wrap('critical')
 def main():
