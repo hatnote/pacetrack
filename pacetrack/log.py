@@ -38,15 +38,3 @@ stdout_sink = SensibleSink(formatter=stdout_fmt,
                            emitter=stdout_emt,
                            filters=[stdout_filter])
 tlog.add_sink(stdout_sink)
-
-
-
-def set_debug(enable=True):
-    if not enable:
-        raise NotImplementedError()
-    dbg_fmtr = file_fmt
-    dbg_emtr = StreamEmitter('stderr')
-
-    dbg_sink = SensibleSink(formatter=dbg_fmtr,
-                            emitter=dbg_emtr)
-    tlog.add_sink(dbg_sink)

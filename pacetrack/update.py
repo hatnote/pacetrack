@@ -35,7 +35,7 @@ from glom import glom, T
 import gevent.monkey
 gevent.monkey.patch_all()
 
-from log import tlog, set_debug, LOG_PATH, build_stream_sink
+from log import tlog, LOG_PATH, build_stream_sink
 import metrics
 
 
@@ -525,13 +525,6 @@ class PTCampaign(object):
         return
 
 
-def get_argparser():
-    desc = 'Update data for tracked projects'
-    prs = ArgumentParser(description=desc)
-    prs.add_argument('--debug', default=DEBUG, action='store_true')
-    return prs
-
-
 def get_command_str():
     return ' '.join([sys.executable] + [shell_quote(v) for v in sys.argv])
 
@@ -574,12 +567,8 @@ def process_all():
 def main():
     tlog.critical('start').success('started {0}', os.getpid())
     print('   -> logging to %s' % LOG_PATH)
-    parser = get_argparser()
-    args = parser.parse_args()
 
     try:
-        if args.debug:
-            set_debug(True)
         process_all()
     except Exception:
         raise  # TODO
