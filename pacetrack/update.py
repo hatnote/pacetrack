@@ -28,7 +28,7 @@ from ashes import AshesEnv
 from boltons.strutils import slugify
 from boltons.fileutils import atomic_save, iter_find_files, mkdir_p
 from boltons.iterutils import unique, partition, first
-from boltons.timeutils import isoparse
+from boltons.timeutils import isoparse, parse_timedelta
 from tqdm import tqdm
 from glom import glom, T
 
@@ -348,6 +348,8 @@ class PTCampaign(object):
     article_list_config = attr.ib(repr=False)
 
     disabled = attr.ib(default=False, repr=False)
+    fetch_frequency = attr.ib(default=datetime.timedelta(seconds=3600))
+    save_frequency = attr.ib(default=datetime.timedelta(days=1))
     article_title_list = attr.ib(default=None, repr=False)
     start_state = attr.ib(default=None, repr=False)
     latest_state = attr.ib(default=None, repr=False)  # populate with load_latest_state()
@@ -361,6 +363,11 @@ class PTCampaign(object):
         kwargs = dict(config_data)
         kwargs['article_list_config'] = dict(kwargs.pop('article_list'))
         kwargs['base_path'] = path
+
+        if kwargs.get('save_frequency'):
+            kwargs['save_frequency'] = parse_timedelta(kwargs['save_frequency'])
+        if kwargs.get('fetch_frequency'):
+            kwargs['fetch_frequency'] = parse_timedelta(kwargs['fetch_frequency'])
 
         ret = cls(**kwargs)
 
