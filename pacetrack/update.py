@@ -150,7 +150,7 @@ class PTCampaignState(object):
 
     @property
     def is_start_state(self):
-        # not really use, but illustrates the intended semantics
+        # not really used, but illustrates the intended semantics
         return self.timestamp == self.campaign.start_state.timestamp
 
     @classmethod
@@ -529,27 +529,16 @@ def get_command_str():
     return ' '.join([sys.executable] + [shell_quote(v) for v in sys.argv])
 
 
-def process_one(campaign_dir):
-    # load config
-    # load article list
-    # fetch data
-    # output timestamped json file to campaign_dir/data/_timestamp_.json
-    # generate static pages
+def load_and_update_campaign(campaign_dir):
     with tlog.critical('load_campaign_dir', path=campaign_dir) as _act:
         pt = PTCampaign.from_path(campaign_dir)
         _act['name'] = pt.name
         if pt.disabled:
             _act.failure("campaign {name!r} disabled, skipping.")
             return pt
-    # TODO: if data doesn't exist for the campaign's start date, just
-    # automatically populate it before doing the current time.
     with tlog.critical('update_campaign', name=pt.name, verbose=True):
         pt.update()
     print()
-    #print('Results:')
-    #for res in pt.latest_state.article_results:
-    #    print('  ', (res['title'], res['results']))
-    #print()
     print('Goal results:')
     for key, results in pt.latest_state.goal_results.items():
         print(' - {name}  ({done_count}/{total_count})  Done: {done}'.format(**results))
@@ -560,30 +549,7 @@ def process_one(campaign_dir):
 def get_all_campaign_dirs(abspath=True):
     # TODO: check for config.yaml in the directory?
     ret = [CAMPAIGNS_PATH + cd if abspath else cd for cd in os.listdir(CAMPAIGNS_PATH) if not cd.startswith('.')]
-    return ret
-
-
-def update_all():
-    "Update all campaigns configured"
-    for campaign_dir in get_all_campaign_dirs():
-        cur_pt = process_one(campaign_dir)
-    return
-
-
-def list_campaigns():
-    print('\n'.join(get_all_campaign_dirs(abspath=False)))
-
-
-
-@tlog.wrap('critical')
-def main():
-    tlog.critical('start').success('started {0}', os.getpid())
-    print('   -> logging to %s' % LOG_PATH)
-
-    try:
-        process_all()
-    except Exception:
-        raise  # TODO
+    return sorted(ret)
 
 
 

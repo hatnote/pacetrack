@@ -30,7 +30,7 @@ tlog.add_sink(default_file_sink)
 
 
 stdout_fmt = file_fmt
-stdout_emt = StreamEmitter('stdout')
+stdout_emt = StreamEmitter('stderr')
 stdout_filter = SensibleFilter(success='critical',
                                failure='debug',
                                exception='debug')
