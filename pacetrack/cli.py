@@ -9,25 +9,26 @@ from .log import tlog, LOG_PATH
 from .update import DEBUG, get_all_campaign_dirs, load_and_update_campaign
 
 
-def update_all(campaign_names=None):
+def update_all(campaign_ids=None, force=False):
     "Update all campaigns configured"
-    campaign_names = set(campaign_names or [])
-    if campaign_names:
+    campaign_ids = set(campaign_ids or [])
+    if campaign_ids:
         known_campaigns = set(get_all_campaign_dirs(abspath=False))
-        unknown_campaigns = campaign_names - known_campaigns
+        unknown_campaigns = campaign_ids - known_campaigns
         if unknown_campaigns:
             raise BadCommand('got unknown campaign names: %s\nexpected one of: %s'
                              % (', '.join(sorted(unknown_campaigns)),
                                 ', '.join(sorted(known_campaigns))))
+
     for campaign_dir in get_all_campaign_dirs():
-        if not campaign_names or os.path.split(campaign_dir)[1] in campaign_names:
-            cur_pt = load_and_update_campaign(campaign_dir)
+        if not campaign_ids or os.path.split(campaign_dir)[1] in campaign_ids:
+            cur_pt = load_and_update_campaign(campaign_dir, force=force)
     return
 
 
-def update(posargs_):
+def update(posargs_, force=False):
     "Update one or more campaigns by name"
-    return update_all(campaign_names=posargs_)
+    return update_all(campaign_ids=posargs_, force=force)
 
 
 def list_campaigns():
@@ -36,17 +37,16 @@ def list_campaigns():
 
 
 def main(argv=None):
-    try:
-        cmd = Command(name='pacetrack', func=None)
-    except Exception:
-        import pdb;pdb.post_mortem()
+    cmd = Command(name='pacetrack', func=None)
 
     # subcommands
-    update_subcmd = Command(update, posargs={'min_count': 1, 'display': 'campaign_name'})
+    update_subcmd = Command(update, posargs={'min_count': 1, 'display': 'campaign_id'})
     # update_subcmd.add('campaign_name')
     cmd.add(update_subcmd)
     cmd.add(update_all)
     cmd.add(list_campaigns)
+
+    cmd.add('--force', parse_as=True, doc='ignore configured fetch frequency and force updates')
 
     # flags
     cmd.add('--debug', missing=DEBUG)

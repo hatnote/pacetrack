@@ -438,7 +438,7 @@ class PTCampaign(object):
     def record_state(self, timestamp=None, _act=None):
         if not timestamp:
             timestamp = datetime.datetime.utcnow()
-        _act['timestamp'] = timestamp
+        _act['timestamp'] = timestamp.isoformat()
         state = PTCampaignState.from_api(self, timestamp)
         state.save()
         return
@@ -512,21 +512,24 @@ class PTCampaign(object):
     def load_latest_state(self):
         self.latest_state = PTCampaignState.from_latest(self)
 
-    def update(self):
+    @tlog.wrap('critical', 'update campaign', verbose=True, inject_as='_act')
+    def update(self, _act):
         "does it all"
         final_update_log_path = STATIC_PATH + 'campaigns/%s/update.log' % self.id
+        _act['name'] = self.name
+        _act['id'] = self.id
+        _act['log_path'] = final_update_log_path
         with atomic_save(final_update_log_path) as f:
             cur_update_sink = build_stream_sink(f)
             old_sinks = tlog.sinks
             tlog.set_sinks(old_sinks + [cur_update_sink])
             try:
-                with tlog.info('campaign update', id=self.id, log_path=final_update_log_path, verbose=True):
-                    self.load_article_list()
-                    self.load_latest_state()
-                    self.record_state()  # defaults to now
-                    self.load_latest_state()
-                    self.render_report()
-                    self.render_article_list()
+                self.load_article_list()
+                self.load_latest_state()
+                self.record_state()  # defaults to now
+                self.load_latest_state()
+                self.render_report()
+                self.render_article_list()
             finally:
                 tlog.set_sinks(old_sinks)
         return
@@ -536,21 +539,27 @@ def get_command_str():
     return ' '.join([sys.executable] + [shell_quote(v) for v in sys.argv])
 
 
-def load_and_update_campaign(campaign_dir):
+def load_and_update_campaign(campaign_dir, force=False):
     with tlog.critical('load_campaign_dir', path=campaign_dir) as _act:
-        pt = PTCampaign.from_path(campaign_dir)
-        _act['name'] = pt.name
-        if pt.disabled:
+        ptc = PTCampaign.from_path(campaign_dir)
+        _act['name'] = ptc.name
+        if ptc.disabled:
             _act.failure("campaign {name!r} disabled, skipping.")
-            return pt
-    with tlog.critical('update_campaign', name=pt.name, verbose=True):
-        pt.update()
+            return ptc
+    ptc.load_latest_state()
+    now = datetime.datetime.utcnow()
+    next_fetch = now if not ptc.latest_state else ptc.latest_state.timestamp + ptc.fetch_frequency
+    if not force and next_fetch > now:
+        tlog.critical('skip_fetch').success('{cid} not out of date, skipping until next fetch at {next_fetch}. ',
+                                            cid=ptc.id, next_fetch=next_fetch)
+        return ptc
+    ptc.update()
     print()
     print('Goal results:')
-    for key, results in pt.latest_state.goal_results.items():
+    for key, results in ptc.latest_state.goal_results.items():
         print(' - {name}  ({done_count}/{total_count})  Done: {done}'.format(**results))
     print()
-    return pt
+    return ptc
 
 
 def get_all_campaign_dirs(abspath=True):
