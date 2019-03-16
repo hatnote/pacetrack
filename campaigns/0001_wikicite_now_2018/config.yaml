@@ -18,7 +18,7 @@ article_list:
   path: "query_selma.json"
   title_key: "page_titleEN"
 fetch_frequency: 1h  # format: 1d 2h 3.5m 0s, parsed by timeutils.parse_timedelta
-save_frequency: 2h
+save_frequency: 1d
 goals:
   - name: "Has Newspaper Infobox"
     desc: "Get exactly one newspaper or magazine infobox on every article"

@@ -26,12 +26,12 @@ def update_all(campaign_ids=None, force=False):
     return
 
 
-def prune(posargs_):
+def prune(posargs_, dry_run):
     campaign_ids = posargs_
     for campaign_dir in get_all_campaign_dirs():
         if not campaign_ids or os.path.split(campaign_dir)[1] in campaign_ids:
             cur_ptc = PTCampaign.from_path(campaign_dir)
-            cur_ptc.prune_by_frequency()
+            cur_ptc.prune_by_frequency(dry_run=dry_run)
 
 
 
@@ -58,6 +58,7 @@ def main(argv=None):
     cmd.add(prune)
 
     cmd.add('--force', parse_as=True, doc='ignore configured fetch frequency and force updates')
+    cmd.add('--dry-run', parse_as=True, doc='log actions without performing them (e.g., do not remove files)')
 
     # flags
     cmd.add('--debug', missing=DEBUG)

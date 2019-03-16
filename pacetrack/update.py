@@ -50,6 +50,12 @@ UPDATED_DT_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 DEBUG = False
 
+# these paths are relative to the campaign directory
+STATE_FULL_PATH_TMPL = '/data/%Y%m/state_full_%Y%m%d_%H%M%S.json.gz'
+STATE_PATH_TMPL = '/data/%Y%m/state_%Y%m%d_%H%M%S.json'
+STATE_FULL_FN_GLOB = 'state_full_*.json.gz'
+STATE_FN_GLOB = 'state_*.json'
+
 
 ASHES_ENV = AshesEnv(TEMPLATE_PATH, filters={'percentage': lambda n: round(n*100, 2)})
 ASHES_ENV.load_all()
@@ -125,11 +131,7 @@ class StateNotFound(Exception):
 
 
 def get_state_filepaths(data_dir, full=True):
-    if full:
-        pattern = 'state_full_*.json.gz'
-    else:
-        pattern = 'state_*.json'
-
+    pattern = STATE_FULL_FN_GLOB if full else STATE_FN_GLOB
     return sorted(iter_find_files(data_dir, pattern))
 
 
@@ -197,11 +199,11 @@ class PTCampaignState(object):
 
     @classmethod
     def from_timestamp(cls, campaign, timestamp, full=True):
-        # TODO: support for hour/minute when present in timestamp
-        if full:
-            strf_tmpl = '/data/%Y%m/state_full_%Y%m%d_*.json.gz'
-        else:
-            strf_tmpl = '/data/%Y%m/state_%Y%m%d_*.json'
+        strf_tmpl = STATE_FULL_PATH_TMPL if full else STATE_PATH_TMPL
+
+        # this handles when a date object is passed in for timestamp
+        # (instead of a datetime)
+        strf_tmpl = strf_tmpl.replace('000000', '*')
 
         start_pattern = timestamp.strftime(strf_tmpl)
         dir_path = campaign.base_path + os.path.split(start_pattern)[0]
@@ -298,7 +300,7 @@ class PTCampaignState(object):
             raise RuntimeError('only intended to be called after a full results population with from_api()')
         save_timestamp = datetime.datetime.utcnow().isoformat()
 
-        result_path = self.campaign.base_path + self.timestamp.strftime('/data/%Y%m/state_%Y%m%d_%H%M%S.json')
+        result_path = self.campaign.base_path + self.timestamp.strftime(STATE_PATH_TMPL)
         mkdir_p(os.path.split(result_path)[0])
 
         result_data = {'campaign_name': self.campaign.name,
@@ -310,9 +312,8 @@ class PTCampaignState(object):
         with atomic_save(result_path) as f:
             json.dump(result_data, f, indent=2, sort_keys=True, default=str)
 
-        full_result_fn = self.timestamp.strftime('state_full_%Y%m%d_%H%M%S.json')
-        full_result_fn_gz = full_result_fn + '.gz'
-        full_result_path = self.campaign.base_path + self.timestamp.strftime('/data/%Y%m/') + full_result_fn_gz
+        full_result_fn = self.timestamp.strftime(STATE_FULL_PATH_TMPL)
+        full_result_path = self.campaign.base_path + full_result_fn
         result_data['article_results'] = [attr.asdict(a) for a in self.article_list]
         with atomic_save(full_result_path) as f:
             gzf = gzip.GzipFile(filename=full_result_fn, fileobj=f)
@@ -516,7 +517,9 @@ class PTCampaign(object):
         return
 
     @tlog.wrap('debug')
-    def prune_by_frequency(self):
+    def prune_by_frequency(self, dry_run=False):
+        # TODO: make this work for all campaign YYYYMM directories
+        # under data dir, not just the most recent one.
         if not self.save_frequency:
             return
         if not self.latest_state:
@@ -524,23 +527,26 @@ class PTCampaign(object):
         state_path = self.get_latest_state_path()
         target_dir = os.path.dirname(state_path)
 
-        full_state_paths = get_state_filepaths(target_dir, full=True)
-        if not full_state_paths:
-            return
-        last_kept_dt = datetime.datetime.strptime(os.path.basename(full_state_paths[0]),
-                                                  'state_full_%Y%m%d_%H%M%S.json.gz')
-        to_prune = []
-        for fsp in full_state_paths[1:-1]:  # ignore the latest and first
-            cur_dt = datetime.datetime.strptime(os.path.basename(fsp), 'state_full_%Y%m%d_%H%M%S.json.gz')
-            if last_kept_dt < (cur_dt - self.save_frequency):
-                last_kept_dt = cur_dt
-            else:
-                to_prune.append(fsp)
-        print()
-        for p in to_prune:
-            with tlog.critical('prune data file', path=p):
-                pass  # TODO
-        print()
+        for full in (True, False):
+            state_paths = get_state_filepaths(target_dir, full=full)
+            if not state_paths:
+                return
+            tmpl = os.path.basename(STATE_FULL_PATH_TMPL if full else STATE_PATH_TMPL)
+            last_kept_dt = datetime.datetime.strptime(os.path.basename(state_paths[0]), tmpl)
+            to_prune = []
+            for fsp in state_paths[1:-1]:  # ignore the latest and first
+                cur_dt = datetime.datetime.strptime(os.path.basename(fsp), tmpl)
+                if last_kept_dt < (cur_dt - self.save_frequency):
+                    last_kept_dt = cur_dt
+                else:
+                    to_prune.append(fsp)
+
+            for p in to_prune:
+                with tlog.critical('prune data file', path=p):
+                    if dry_run:
+                        continue
+                    os.remove(p)
+        return
 
     def get_latest_state_path(self, full=True):
         data_base_dir = self.base_path + '/data/'
@@ -574,6 +580,7 @@ class PTCampaign(object):
                 self.load_latest_state()
                 self.record_state()  # defaults to now
                 self.load_latest_state()
+                self.prune_by_frequency()
                 self.render_report()
                 self.render_article_list()
             finally:
