@@ -6,7 +6,7 @@ import sys
 from face import Command, Flag, face_middleware, BadCommand
 
 from .log import tlog, LOG_PATH
-from .update import DEBUG, get_all_campaign_dirs, load_and_update_campaign
+from .update import DEBUG, get_all_campaign_dirs, load_and_update_campaign, PTCampaign
 
 
 def update_all(campaign_ids=None, force=False):
@@ -24,6 +24,16 @@ def update_all(campaign_ids=None, force=False):
         if not campaign_ids or os.path.split(campaign_dir)[1] in campaign_ids:
             cur_pt = load_and_update_campaign(campaign_dir, force=force)
     return
+
+
+def prune(posargs_):
+    campaign_ids = posargs_
+    for campaign_dir in get_all_campaign_dirs():
+        if not campaign_ids or os.path.split(campaign_dir)[1] in campaign_ids:
+            cur_ptc = PTCampaign.from_path(campaign_dir)
+            cur_ptc.prune_by_frequency()
+
+
 
 
 def update(posargs_, force=False):
@@ -45,6 +55,7 @@ def main(argv=None):
     cmd.add(update_subcmd)
     cmd.add(update_all)
     cmd.add(list_campaigns)
+    cmd.add(prune)
 
     cmd.add('--force', parse_as=True, doc='ignore configured fetch frequency and force updates')
 

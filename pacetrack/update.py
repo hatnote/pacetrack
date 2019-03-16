@@ -124,6 +124,16 @@ class StateNotFound(Exception):
     pass
 
 
+def get_state_filepaths(data_dir, full=True):
+    if full:
+        pattern = 'state_full_*.json.gz'
+    else:
+        pattern = 'state_*.json'
+
+    return sorted(iter_find_files(data_dir, pattern))
+
+
+
 @attr.s
 class PTCampaignState(object):
     campaign = attr.ib()
@@ -181,12 +191,7 @@ class PTCampaignState(object):
             raise StateNotFound('no numeric data directories found in %r' % data_base_dir)
         latest_dir = data_base_dir + sorted(data_dirs)[-1]
 
-        if full:
-            pattern = 'state_full_*.json.gz'
-        else:
-            pattern = 'state_*.json'
-
-        latest_file_path = sorted(iter_find_files(latest_dir, pattern))[-1]
+        latest_file_path = get_state_filepaths(latest_dir, full=full)[-1]
 
         return cls.from_json_path(campaign, latest_file_path, full=full)
 
@@ -441,6 +446,7 @@ class PTCampaign(object):
         _act['timestamp'] = timestamp.isoformat()
         state = PTCampaignState.from_api(self, timestamp)
         state.save()
+
         return
 
     def render_report(self):
@@ -509,8 +515,48 @@ class PTCampaign(object):
             json.dump(ctx, json_f, indent=2, sort_keys=True)
         return
 
+    @tlog.wrap('debug')
+    def prune_by_frequency(self):
+        if not self.save_frequency:
+            return
+        if not self.latest_state:
+            self.load_latest_state()
+        state_path = self.get_latest_state_path()
+        target_dir = os.path.dirname(state_path)
+
+        full_state_paths = get_state_filepaths(target_dir, full=True)
+        if not full_state_paths:
+            return
+        last_kept_dt = datetime.datetime.strptime(os.path.basename(full_state_paths[0]),
+                                                  'state_full_%Y%m%d_%H%M%S.json.gz')
+        to_prune = []
+        for fsp in full_state_paths[1:-1]:  # ignore the latest and first
+            cur_dt = datetime.datetime.strptime(os.path.basename(fsp), 'state_full_%Y%m%d_%H%M%S.json.gz')
+            if last_kept_dt < (cur_dt - self.save_frequency):
+                last_kept_dt = cur_dt
+            else:
+                to_prune.append(fsp)
+        print()
+        for p in to_prune:
+            with tlog.critical('prune data file', path=p):
+                pass  # TODO
+        print()
+
+    def get_latest_state_path(self, full=True):
+        data_base_dir = self.base_path + '/data/'
+        data_dirs = next(os.walk(data_base_dir))[1]
+        data_dirs = [d for d in data_dirs if d.isdigit()]  # only numeric dir names
+        if not data_dirs:
+            raise StateNotFound('no numeric data directories found in %r' % data_base_dir)
+        latest_dir = data_base_dir + sorted(data_dirs)[-1]
+
+        ret = get_state_filepaths(latest_dir, full=full)[-1]
+
+        return ret
+
     def load_latest_state(self):
-        self.latest_state = PTCampaignState.from_latest(self)
+        latest_state_path = self.get_latest_state_path(full=True)
+        self.latest_state = PTCampaignState.from_json_path(self, latest_state_path, full=True)
 
     @tlog.wrap('critical', 'update campaign', verbose=True, inject_as='_act')
     def update(self, _act):
