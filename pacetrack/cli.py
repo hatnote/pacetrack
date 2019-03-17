@@ -80,7 +80,6 @@ def prune(posargs_, dry_run):
 
 def update(posargs_, args_, jsub=False, force=False):
     "Update one or more campaigns by name"
-    import pdb;pdb.set_trace()
     return update_all(campaign_ids=posargs_, force=force, jsub=jsub, args_=args_)
 
 
