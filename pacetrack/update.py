@@ -28,14 +28,14 @@ from ashes import AshesEnv
 from boltons.strutils import slugify
 from boltons.fileutils import atomic_save, iter_find_files, mkdir_p
 from boltons.iterutils import unique, partition, first
-from boltons.timeutils import isoparse
+from boltons.timeutils import isoparse, parse_timedelta
 from tqdm import tqdm
 from glom import glom, T
 
 import gevent.monkey
 gevent.monkey.patch_all()
 
-from log import tlog, set_debug, LOG_PATH, build_stream_sink
+from log import tlog, LOG_PATH, build_stream_sink
 import metrics
 
 
@@ -49,6 +49,12 @@ RUN_UUID = uuid.uuid4()
 UPDATED_DT_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 DEBUG = False
+
+# these paths are relative to the campaign directory
+STATE_FULL_PATH_TMPL = '/data/%Y%m/state_full_%Y%m%d_%H%M%S.json.gz'
+STATE_PATH_TMPL = '/data/%Y%m/state_%Y%m%d_%H%M%S.json'
+STATE_FULL_FN_GLOB = 'state_full_*.json.gz'
+STATE_FN_GLOB = 'state_*.json'
 
 
 ASHES_ENV = AshesEnv(TEMPLATE_PATH, filters={'percentage': lambda n: round(n*100, 2)})
@@ -124,6 +130,12 @@ class StateNotFound(Exception):
     pass
 
 
+def get_state_filepaths(data_dir, full=True):
+    pattern = STATE_FULL_FN_GLOB if full else STATE_FN_GLOB
+    return sorted(iter_find_files(data_dir, pattern))
+
+
+
 @attr.s
 class PTCampaignState(object):
     campaign = attr.ib()
@@ -150,7 +162,7 @@ class PTCampaignState(object):
 
     @property
     def is_start_state(self):
-        # not really use, but illustrates the intended semantics
+        # not really used, but illustrates the intended semantics
         return self.timestamp == self.campaign.start_state.timestamp
 
     @classmethod
@@ -181,22 +193,17 @@ class PTCampaignState(object):
             raise StateNotFound('no numeric data directories found in %r' % data_base_dir)
         latest_dir = data_base_dir + sorted(data_dirs)[-1]
 
-        if full:
-            pattern = 'state_full_*.json.gz'
-        else:
-            pattern = 'state_*.json'
-
-        latest_file_path = sorted(iter_find_files(latest_dir, pattern))[-1]
+        latest_file_path = get_state_filepaths(latest_dir, full=full)[-1]
 
         return cls.from_json_path(campaign, latest_file_path, full=full)
 
     @classmethod
     def from_timestamp(cls, campaign, timestamp, full=True):
-        # TODO: support for hour/minute when present in timestamp
-        if full:
-            strf_tmpl = '/data/%Y%m/state_full_%Y%m%d_*.json.gz'
-        else:
-            strf_tmpl = '/data/%Y%m/state_%Y%m%d_*.json'
+        strf_tmpl = STATE_FULL_PATH_TMPL if full else STATE_PATH_TMPL
+
+        # this handles when a date object is passed in for timestamp
+        # (instead of a datetime)
+        strf_tmpl = strf_tmpl.replace('000000', '*')
 
         start_pattern = timestamp.strftime(strf_tmpl)
         dir_path = campaign.base_path + os.path.split(start_pattern)[0]
@@ -293,7 +300,7 @@ class PTCampaignState(object):
             raise RuntimeError('only intended to be called after a full results population with from_api()')
         save_timestamp = datetime.datetime.utcnow().isoformat()
 
-        result_path = self.campaign.base_path + self.timestamp.strftime('/data/%Y%m/state_%Y%m%d_%H%M%S.json')
+        result_path = self.campaign.base_path + self.timestamp.strftime(STATE_PATH_TMPL)
         mkdir_p(os.path.split(result_path)[0])
 
         result_data = {'campaign_name': self.campaign.name,
@@ -305,9 +312,8 @@ class PTCampaignState(object):
         with atomic_save(result_path) as f:
             json.dump(result_data, f, indent=2, sort_keys=True, default=str)
 
-        full_result_fn = self.timestamp.strftime('state_full_%Y%m%d_%H%M%S.json')
-        full_result_fn_gz = full_result_fn + '.gz'
-        full_result_path = self.campaign.base_path + self.timestamp.strftime('/data/%Y%m/') + full_result_fn_gz
+        full_result_fn = self.timestamp.strftime(STATE_FULL_PATH_TMPL)
+        full_result_path = self.campaign.base_path + full_result_fn
         result_data['article_results'] = [attr.asdict(a) for a in self.article_list]
         with atomic_save(full_result_path) as f:
             gzf = gzip.GzipFile(filename=full_result_fn, fileobj=f)
@@ -348,6 +354,8 @@ class PTCampaign(object):
     article_list_config = attr.ib(repr=False)
 
     disabled = attr.ib(default=False, repr=False)
+    fetch_frequency = attr.ib(default=datetime.timedelta(seconds=3600))
+    save_frequency = attr.ib(default=datetime.timedelta(days=1))
     article_title_list = attr.ib(default=None, repr=False)
     start_state = attr.ib(default=None, repr=False)
     latest_state = attr.ib(default=None, repr=False)  # populate with load_latest_state()
@@ -361,6 +369,11 @@ class PTCampaign(object):
         kwargs = dict(config_data)
         kwargs['article_list_config'] = dict(kwargs.pop('article_list'))
         kwargs['base_path'] = path
+
+        if kwargs.get('save_frequency'):
+            kwargs['save_frequency'] = parse_timedelta(kwargs['save_frequency'])
+        if kwargs.get('fetch_frequency'):
+            kwargs['fetch_frequency'] = parse_timedelta(kwargs['fetch_frequency'])
 
         ret = cls(**kwargs)
 
@@ -431,9 +444,10 @@ class PTCampaign(object):
     def record_state(self, timestamp=None, _act=None):
         if not timestamp:
             timestamp = datetime.datetime.utcnow()
-        _act['timestamp'] = timestamp
+        _act['timestamp'] = timestamp.isoformat()
         state = PTCampaignState.from_api(self, timestamp)
         state.save()
+
         return
 
     def render_report(self):
@@ -502,87 +516,113 @@ class PTCampaign(object):
             json.dump(ctx, json_f, indent=2, sort_keys=True)
         return
 
-    def load_latest_state(self):
-        self.latest_state = PTCampaignState.from_latest(self)
+    @tlog.wrap('debug')
+    def prune_by_frequency(self, dry_run=False):
+        # TODO: make this work for all campaign YYYYMM directories
+        # under data dir, not just the most recent one.
+        if not self.save_frequency:
+            return
+        if not self.latest_state:
+            self.load_latest_state()
+        state_path = self.get_latest_state_path()
+        if state_path is None:
+            return
+        target_dir = os.path.dirname(state_path)
 
-    def update(self):
+        for full in (True, False):
+            state_paths = get_state_filepaths(target_dir, full=full)
+            if not state_paths:
+                return
+            tmpl = os.path.basename(STATE_FULL_PATH_TMPL if full else STATE_PATH_TMPL)
+            last_kept_dt = datetime.datetime.strptime(os.path.basename(state_paths[0]), tmpl)
+            to_prune = []
+            for fsp in state_paths[1:-1]:  # ignore the latest and first
+                cur_dt = datetime.datetime.strptime(os.path.basename(fsp), tmpl)
+                if last_kept_dt < (cur_dt - self.save_frequency):
+                    last_kept_dt = cur_dt
+                else:
+                    to_prune.append(fsp)
+
+            for p in to_prune:
+                with tlog.critical('prune data file', path=p):
+                    if dry_run:
+                        continue
+                    os.remove(p)
+        return
+
+    def get_latest_state_path(self, full=True):
+        data_base_dir = self.base_path + '/data/'
+        data_dirs = next(os.walk(data_base_dir))[1]
+        data_dirs = [d for d in data_dirs if d.isdigit()]  # only numeric dir names
+        if not data_dirs:
+            raise StateNotFound('no numeric data directories found in %r' % data_base_dir)
+        latest_dir = data_base_dir + sorted(data_dirs)[-1]
+
+        state_paths = get_state_filepaths(latest_dir, full=full)
+        if not state_paths:
+            return None
+
+        return state_paths[-1]
+
+    def load_latest_state(self):
+        latest_state_path = self.get_latest_state_path(full=True)
+        self.latest_state = PTCampaignState.from_json_path(self, latest_state_path, full=True)
+
+    @tlog.wrap('critical', 'update campaign', verbose=True, inject_as='_act')
+    def update(self, _act):
         "does it all"
         final_update_log_path = STATIC_PATH + 'campaigns/%s/update.log' % self.id
+        _act['name'] = self.name
+        _act['id'] = self.id
+        _act['log_path'] = final_update_log_path
         with atomic_save(final_update_log_path) as f:
             cur_update_sink = build_stream_sink(f)
             old_sinks = tlog.sinks
             tlog.set_sinks(old_sinks + [cur_update_sink])
             try:
-                with tlog.info('campaign update', id=self.id, log_path=final_update_log_path, verbose=True):
-                    self.load_article_list()
-                    self.load_latest_state()
-                    self.record_state()  # defaults to now
-                    self.load_latest_state()
-                    self.render_report()
-                    self.render_article_list()
+                self.load_article_list()
+                self.load_latest_state()
+                self.record_state()  # defaults to now
+                self.load_latest_state()
+                self.prune_by_frequency()
+                self.render_report()
+                self.render_article_list()
             finally:
                 tlog.set_sinks(old_sinks)
         return
-
-
-def get_argparser():
-    desc = 'Update data for tracked projects'
-    prs = ArgumentParser(description=desc)
-    prs.add_argument('--debug', default=DEBUG, action='store_true')
-    return prs
 
 
 def get_command_str():
     return ' '.join([sys.executable] + [shell_quote(v) for v in sys.argv])
 
 
-def process_one(campaign_dir):
-    # load config
-    # load article list
-    # fetch data
-    # output timestamped json file to campaign_dir/data/_timestamp_.json
-    # generate static pages
+def load_and_update_campaign(campaign_dir, force=False):
     with tlog.critical('load_campaign_dir', path=campaign_dir) as _act:
-        pt = PTCampaign.from_path(campaign_dir)
-        _act['name'] = pt.name
-        if pt.disabled:
+        ptc = PTCampaign.from_path(campaign_dir)
+        _act['name'] = ptc.name
+        if ptc.disabled:
             _act.failure("campaign {name!r} disabled, skipping.")
-            return pt
-    # TODO: if data doesn't exist for the campaign's start date, just
-    # automatically populate it before doing the current time.
-    with tlog.critical('update_campaign', name=pt.name, verbose=True):
-        pt.update()
+            return ptc
+    ptc.load_latest_state()
+    now = datetime.datetime.utcnow()
+    next_fetch = now if not ptc.latest_state else ptc.latest_state.timestamp + ptc.fetch_frequency
+    if not force and next_fetch > now:
+        tlog.critical('skip_fetch').success('{cid} not out of date, skipping until next fetch at {next_fetch}. ',
+                                            cid=ptc.id, next_fetch=next_fetch)
+        return ptc
+    ptc.update()
     print()
-    #print('Results:')
-    #for res in pt.latest_state.article_results:
-    #    print('  ', (res['title'], res['results']))
-    #print()
     print('Goal results:')
-    for key, results in pt.latest_state.goal_results.items():
+    for key, results in ptc.latest_state.goal_results.items():
         print(' - {name}  ({done_count}/{total_count})  Done: {done}'.format(**results))
     print()
-    return pt
+    return ptc
 
 
-def process_all():
-    for campaign_dir in os.listdir(CAMPAIGNS_PATH):
-        if not campaign_dir.startswith('.'):
-            cur_pt = process_one(CAMPAIGNS_PATH + campaign_dir)
-    # import pdb;pdb.set_trace()
-
-@tlog.wrap('critical')
-def main():
-    tlog.critical('start').success('started {0}', os.getpid())
-    print('   -> logging to %s' % LOG_PATH)
-    parser = get_argparser()
-    args = parser.parse_args()
-
-    try:
-        if args.debug:
-            set_debug(True)
-        process_all()
-    except Exception:
-        raise  # TODO
+def get_all_campaign_dirs(abspath=True):
+    # TODO: check for config.yaml in the directory?
+    ret = [CAMPAIGNS_PATH + cd if abspath else cd for cd in os.listdir(CAMPAIGNS_PATH) if not cd.startswith('.')]
+    return sorted(ret)
 
 
 
