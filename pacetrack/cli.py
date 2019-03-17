@@ -11,7 +11,7 @@ from .log import tlog, LOG_PATH, JSUB_LOG_PATH
 from .update import DEBUG, get_all_campaign_dirs, load_and_update_campaign, PTCampaign
 
 
-def _build_jsub_cmd(args_, force, campaign_id):
+def _build_jsub_update(args_, force, campaign_id):
     name = 'pt_update_' + campaign_id
     jsub_campaign_logs_path = JSUB_LOG_PATH + ('%s/' % campaign_id)
 
@@ -23,7 +23,7 @@ def _build_jsub_cmd(args_, force, campaign_id):
     ret = ['jsub', '-once', '-N', name, '-o', jsub_out_path, '-e', jsub_err_path]
 
     ret.append(args_.argv[0])  # executable
-    ret.extend(args_.subcmds)
+    ret.append('update')
 
     if force:
         ret.append('--force')
@@ -33,8 +33,8 @@ def _build_jsub_cmd(args_, force, campaign_id):
     return ret
 
 
-def _run_jsub_cmd(args_, force, campaign_id):
-    argv = _build_jsub_cmd(args_, force, campaign_id)
+def _run_jsub_update(args_, force, campaign_id):
+    argv = _build_jsub_update(args_, force, campaign_id)
 
     with tlog.critical('jsub', argv=argv):
         subprocess.check_call(argv)
@@ -61,7 +61,7 @@ def update_all(campaign_ids=None, jsub=False, force=False, args_=None):
         if campaign_ids and cur_campaign_id not in campaign_ids:
             continue
         if jsub:
-            _run_jsub_cmd(args_, force, cur_campaign_id)
+            _run_jsub_update(args_, force, cur_campaign_id)
             continue
 
         cur_pt = load_and_update_campaign(campaign_dir, force=force)
