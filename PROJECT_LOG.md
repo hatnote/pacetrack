@@ -13,18 +13,12 @@
 * Show goal criteria from metric config
 * Link to update.log from the campaign
 * "More info" cell for article list
-* /static/campaign_name/campaign.json
 * "This campaign ended ..." banner
 * Base home.html off of cached campaign.json files.
 * Allow referencing campaigns by unambiguous id prefix
 
 ### Deployment
 
-* Subcommand for running update
-  * --jsub flag (issue all jsubs in parallel)
-  * --no-parallel?
-
-* update-schedule subcommand
 * rerender subcommand
 * clear cached data subcommand
 
@@ -38,6 +32,11 @@
 
 ## Complete
 
+* /static/campaign_name/campaign.json
+  * Structured version of the data used to generate the campaign info page
+* --jsub option for update and update-all subcommands
+  * to be used on production, to enable non-overlapping updates on
+    campaigns, with parallel updates across campaigns.
 * update-all subcommand
 * frequency campaign configuration field
    * fetch_frequency
