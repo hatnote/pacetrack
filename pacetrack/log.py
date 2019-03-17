@@ -6,6 +6,7 @@ from lithoxyl.emitters import FileEmitter
 CUR_PATH = os.path.dirname(os.path.abspath(__file__))
 PROJECT_PATH = os.path.dirname(CUR_PATH)
 LOG_PATH = PROJECT_PATH + '/pacetrack.log'
+JSUB_LOG_PATH = PROJECT_PATH + '/jsub_logs/'
 
 
 tlog = Logger('pacetrack')

@@ -2,15 +2,51 @@
 
 import os
 import sys
+import subprocess
 
+from boltons.fileutils import mkdir_p
 from face import Command, Flag, face_middleware, BadCommand
 
-from .log import tlog, LOG_PATH
+from .log import tlog, LOG_PATH, JSUB_LOG_PATH
 from .update import DEBUG, get_all_campaign_dirs, load_and_update_campaign, PTCampaign
 
 
-def update_all(campaign_ids=None, force=False):
+def _build_jsub_cmd(args_, force, campaign_id):
+    name = 'pt_update_' + campaign_id
+    jsub_campaign_logs_path = JSUB_LOG_PATH + ('%s/' % campaign_id)
+
+    mkdir_p(jsub_campaign_logs_path)
+
+    jsub_out_path = jsub_campaign_logs_path + campaign_id + '_out.log'
+    jsub_err_path = jsub_campaign_logs_path + campaign_id + '_err.log'
+
+    ret = ['jsub', '-once', '-N', name, '-o', jsub_out_path, '-e', jsub_err_path]
+
+    ret.append(args_.argv[0])  # executable
+    ret.extend(args_.subcmds)
+
+    if force:
+        ret.append('--force')
+
+    ret.append(campaign_id)
+
+    return ret
+
+
+def _run_jsub_cmd(args_, force, campaign_id):
+    argv = _build_jsub_cmd(args_, force, campaign_id)
+
+    with tlog.critical('jsub', argv=argv):
+        subprocess.check_call(argv)
+
+    return
+
+
+def update_all(campaign_ids=None, jsub=False, force=False, args_=None):
     "Update all campaigns configured"
+    if jsub and not args_:
+        raise RuntimeError('jsub requires parsed arguments (args_)')
+
     campaign_ids = set(campaign_ids or [])
     if campaign_ids:
         known_campaigns = set(get_all_campaign_dirs(abspath=False))
@@ -21,8 +57,14 @@ def update_all(campaign_ids=None, force=False):
                                 ', '.join(sorted(known_campaigns))))
 
     for campaign_dir in get_all_campaign_dirs():
-        if not campaign_ids or os.path.split(campaign_dir)[1] in campaign_ids:
-            cur_pt = load_and_update_campaign(campaign_dir, force=force)
+        cur_campaign_id = os.path.split(campaign_dir)[1]
+        if campaign_ids and cur_campaign_id not in campaign_ids:
+            continue
+        if jsub:
+            _run_jsub_cmd(args_, force, cur_campaign_id)
+            continue
+
+        cur_pt = load_and_update_campaign(campaign_dir, force=force)
     return
 
 
@@ -36,14 +78,22 @@ def prune(posargs_, dry_run):
 
 
 
-def update(posargs_, force=False):
+def update(posargs_, args_, jsub=False, force=False):
     "Update one or more campaigns by name"
-    return update_all(campaign_ids=posargs_, force=force)
+    import pdb;pdb.set_trace()
+    return update_all(campaign_ids=posargs_, force=force, jsub=jsub, args_=args_)
 
 
 def list_campaigns():
     "List available campaigns"
     print('\n'.join(get_all_campaign_dirs(abspath=False)))
+
+
+def jsub_mw(jsub, args_):
+    argv = list(args_.argv)
+    argv.remove('--jsub')
+
+
 
 
 def main(argv=None):
@@ -55,8 +105,9 @@ def main(argv=None):
     cmd.add(update_subcmd)
     cmd.add(update_all)
     cmd.add(list_campaigns)
-    cmd.add(prune)
+    # cmd.add(prune)  # mostly for testing
 
+    cmd.add('--jsub', parse_as=True, doc='run commands through the WMF Labs job grid (for production use only)')
     cmd.add('--force', parse_as=True, doc='ignore configured fetch frequency and force updates')
     cmd.add('--dry-run', parse_as=True, doc='log actions without performing them (e.g., do not remove files)')
 

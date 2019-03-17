@@ -14,19 +14,16 @@
 * Link to update.log from the campaign
 * "More info" cell for article list
 * /static/campaign_name/campaign.json
-* frequency campaign configuration field
-   * fetch_frequency
-   * save_frequency - Run hourly, keep one per day
-   * Allows scaling up to megaprojects (fetch daily) and down to editathon (fetch every 10 minutes)
 * "This campaign ended ..." banner
 * Base home.html off of cached campaign.json files.
+* Allow referencing campaigns by unambiguous id prefix
 
 ### Deployment
 
 * Subcommand for running update
   * --jsub flag (issue all jsubs in parallel)
   * --no-parallel?
-* update-all subcommand
+
 * update-schedule subcommand
 * rerender subcommand
 * clear cached data subcommand
@@ -41,6 +38,11 @@
 
 ## Complete
 
+* update-all subcommand
+* frequency campaign configuration field
+   * fetch_frequency
+   * save_frequency - Run hourly, keep one per day
+   * Allows scaling up to megaprojects (fetch daily) and down to editathon (fetch every 10 minutes)
 * Generate campaign.json (cached campaign progress)
 * Add goal "desc" field to go with "name"
   * Integrated into campaign overview
