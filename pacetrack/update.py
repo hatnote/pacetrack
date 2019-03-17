@@ -525,6 +525,8 @@ class PTCampaign(object):
         if not self.latest_state:
             self.load_latest_state()
         state_path = self.get_latest_state_path()
+        if state_path is None:
+            return
         target_dir = os.path.dirname(state_path)
 
         for full in (True, False):
@@ -556,9 +558,11 @@ class PTCampaign(object):
             raise StateNotFound('no numeric data directories found in %r' % data_base_dir)
         latest_dir = data_base_dir + sorted(data_dirs)[-1]
 
-        ret = get_state_filepaths(latest_dir, full=full)[-1]
+        state_paths = get_state_filepaths(latest_dir, full=full)
+        if not state_paths:
+            return None
 
-        return ret
+        return state_paths[-1]
 
     def load_latest_state(self):
         latest_state_path = self.get_latest_state_path(full=True)
