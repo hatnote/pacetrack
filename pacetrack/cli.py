@@ -5,7 +5,7 @@ import sys
 import subprocess
 
 from boltons.fileutils import mkdir_p
-from face import Command, Flag, face_middleware, BadCommand
+from face import Command, Flag, face_middleware, UsageError
 
 from .log import tlog, LOG_PATH, JSUB_LOG_PATH
 from .update import DEBUG, get_all_campaign_dirs, load_and_update_campaign, PTCampaign
@@ -52,7 +52,7 @@ def update_all(campaign_ids=None, jsub=False, force=False, args_=None):
         known_campaigns = set(get_all_campaign_dirs(abspath=False))
         unknown_campaigns = campaign_ids - known_campaigns
         if unknown_campaigns:
-            raise BadCommand('got unknown campaign names: %s\nexpected one of: %s'
+            raise UsageError('got unknown campaign names: %s\nexpected one of: %s'
                              % (', '.join(sorted(unknown_campaigns)),
                                 ', '.join(sorted(known_campaigns))))
 
