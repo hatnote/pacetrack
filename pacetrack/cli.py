@@ -9,6 +9,12 @@ from face import Command, Flag, face_middleware, UsageError
 
 from .log import tlog, LOG_PATH, JSUB_LOG_PATH
 from .update import DEBUG, get_all_campaign_dirs, load_and_update_campaign, PTCampaign
+from ._version import __version__
+
+
+def print_version():
+    'Print the pacetrack version and exit'
+    print('pacetrack version %s' % __version__)
 
 
 def _build_jsub_update(args_, force, campaign_id):
@@ -104,6 +110,7 @@ def main(argv=None):
     cmd.add(update_subcmd)
     cmd.add(update_all)
     cmd.add(list_campaigns)
+    cmd.add(print_version, name='version')
     # cmd.add(prune)  # mostly for testing
 
     cmd.add('--jsub', parse_as=True, doc='run commands through the WMF Labs job grid (for production use only)')
