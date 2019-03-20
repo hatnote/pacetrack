@@ -94,6 +94,11 @@ def list_campaigns():
     print('\n'.join(get_all_campaign_dirs(abspath=False)))
 
 
+def list_states(posargs_):  # TODO
+    "List available state timestamps for a given campaign name"
+    pass
+
+
 def jsub_mw(jsub, args_):
     argv = list(args_.argv)
     argv.remove('--jsub')

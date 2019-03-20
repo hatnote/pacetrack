@@ -569,12 +569,13 @@ class PTCampaign(object):
         self.latest_state = PTCampaignState.from_json_path(self, latest_state_path, full=True)
 
     @tlog.wrap('critical', 'update campaign', verbose=True, inject_as='_act')
-    def update(self, _act):
+    def update(self, force=False, _act=None):
         "does it all"
         final_update_log_path = STATIC_PATH + 'campaigns/%s/update.log' % self.id
         _act['name'] = self.name
         _act['id'] = self.id
         _act['log_path'] = final_update_log_path
+        now = datetime.datetime.utcnow()
         with atomic_save(final_update_log_path) as f:
             cur_update_sink = build_stream_sink(f)
             old_sinks = tlog.sinks
@@ -582,6 +583,14 @@ class PTCampaign(object):
             try:
                 self.load_article_list()
                 self.load_latest_state()
+
+                next_fetch = now if not self.latest_state else self.latest_state.timestamp + self.fetch_frequency
+                if not force and next_fetch > now:
+                    tlog.critical('skip_fetch').success(
+                        '{cid} not out of date, skipping until next fetch at {next_fetch}. ',
+                        cid=self.id, next_fetch=next_fetch)
+                    return
+
                 self.record_state()  # defaults to now
                 self.load_latest_state()
                 self.prune_by_frequency()
@@ -590,6 +599,13 @@ class PTCampaign(object):
             finally:
                 tlog.set_sinks(old_sinks)
         return
+
+    @tlog.wrap('critical', 'render campaign')
+    def render(self):
+        self.load_article_list()
+        self.load_latest_state()
+        self.render_report()
+        self.render_article_list()
 
 
 def get_command_str():
@@ -603,14 +619,7 @@ def load_and_update_campaign(campaign_dir, force=False):
         if ptc.disabled:
             _act.failure("campaign {name!r} disabled, skipping.")
             return ptc
-    ptc.load_latest_state()
-    now = datetime.datetime.utcnow()
-    next_fetch = now if not ptc.latest_state else ptc.latest_state.timestamp + ptc.fetch_frequency
-    if not force and next_fetch > now:
-        tlog.critical('skip_fetch').success('{cid} not out of date, skipping until next fetch at {next_fetch}. ',
-                                            cid=ptc.id, next_fetch=next_fetch)
-        return ptc
-    ptc.update()
+    ptc.update(force=force)
     print()
     print('Goal results:')
     for key, results in ptc.latest_state.goal_results.items():
