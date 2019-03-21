@@ -82,8 +82,6 @@ def prune(posargs_, dry_run):
             cur_ptc.prune_by_frequency(dry_run=dry_run)
 
 
-
-
 def update(posargs_, args_, jsub=False, force=False):
     "Update one or more campaigns by name"
     return update_all(campaign_ids=posargs_, force=force, jsub=jsub, args_=args_)
@@ -99,11 +97,16 @@ def list_states(posargs_):  # TODO
     pass
 
 
-def jsub_mw(jsub, args_):
-    argv = list(args_.argv)
-    argv.remove('--jsub')
-
-
+def render_all():
+    "Render reports for all campaigns using the freshest data already fetched."
+    campaign_dirs = get_all_campaign_dirs()
+    for cd in campaign_dirs:
+        with tlog.critical('load_campaign_dir', path=cd) as _act:
+            ptc = PTCampaign.from_path(cd)
+            _act['name'] = ptc.name
+        ptc.render()
+        # TODO: render home
+    return
 
 
 def main(argv=None):
@@ -114,6 +117,7 @@ def main(argv=None):
     # update_subcmd.add('campaign_name')
     cmd.add(update_subcmd)
     cmd.add(update_all)
+    cmd.add(render_all)
     cmd.add(list_campaigns)
     cmd.add(print_version, name='version')
     # cmd.add(prune)  # mostly for testing
