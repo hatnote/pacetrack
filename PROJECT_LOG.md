@@ -14,12 +14,11 @@
 * Link to update.log from the campaign
 * "More info" cell for article list
 * "This campaign ended ..." banner
-* Base home.html off of cached campaign.json files.
 * Allow referencing campaigns by unambiguous id prefix
+* Archive campaign (no longer shows up in list)
 
 ### Deployment
 
-* rerender subcommand
 * clear cached data subcommand
 
 ### Future
@@ -32,6 +31,8 @@
 
 ## Complete
 
+* rerender subcommand
+  * based off of already-fetched data
 * /static/campaign_name/campaign.json
   * Structured version of the data used to generate the campaign info page
 * --jsub option for update and update-all subcommands
