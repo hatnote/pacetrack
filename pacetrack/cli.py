@@ -82,9 +82,9 @@ def prune(posargs_, dry_run):
             cur_ptc.prune_by_frequency(dry_run=dry_run)
 
 
-def update(posargs_, args_, jsub=False, force=False):
+def update(campaign_ids, args_, jsub=False, force=False):
     "Update one or more campaigns by name"
-    return update_all(campaign_ids=posargs_, force=force, jsub=jsub, args_=args_)
+    return update_all(campaign_ids, force=force, jsub=jsub, args_=args_)
 
 
 def list_campaigns():
@@ -113,7 +113,7 @@ def main(argv=None):
     cmd = Command(name='pacetrack', func=None)
 
     # subcommands
-    update_subcmd = Command(update, posargs={'min_count': 1, 'display': 'campaign_id'})
+    update_subcmd = Command(update, posargs={'min_count': 1, 'display': 'campaign_id', 'provides': 'campaign_ids'})
     # update_subcmd.add('campaign_name')
     cmd.add(update_subcmd)
     cmd.add(update_all)
@@ -132,7 +132,12 @@ def main(argv=None):
     # middlewares
     cmd.add(mw_cli_log)
 
-    cmd.run()
+    try:
+        cmd.run()
+    except Exception:
+        if os.getenv('PACETRACK_ENABLE_DEBUG'):
+            import pdb;pdb.post_mortem()
+        raise
 
 
 @face_middleware
