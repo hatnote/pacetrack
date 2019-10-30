@@ -132,7 +132,12 @@ def main(argv=None):
     # middlewares
     cmd.add(mw_cli_log)
 
-    cmd.run()
+    try:
+        cmd.run()
+    except Exception:
+        if os.getenv('PACETRACK_ENABLE_DEBUG'):
+            import pdb;pdb.post_mortem()
+        raise
 
 
 @face_middleware
