@@ -33,10 +33,12 @@ setup(
                       'attrs',
                       'boltons',
                       'face',
+                      'glom',
                       'gevent==1.2.2',
                       'hyperlink',
                       'lithoxyl',
                       'PyNaCl',
+                      'requests',
                       'ruamel.yaml',
                       'schema',
                       'tqdm']

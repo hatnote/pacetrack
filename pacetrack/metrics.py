@@ -91,7 +91,6 @@ def assessment_avg(pta, scale=None, wikiproject=None):
         assessments = [(p, a) for p, a in assessment if p == wikiproject]
     if scale:
         pass
-    import pdb;pdb.set_trace()
     """
     pass
 
@@ -184,7 +183,6 @@ def _get_templates(oldid):
     try:
         templates = revisionResponse['parse']['templates']
     except KeyError:
-        import pdb;pdb.post_mortem()
         raise
     ret = [t['*'].replace('Template:', '') for t in templates]
     return ret
