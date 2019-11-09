@@ -30,12 +30,15 @@ default_file_sink = build_stream_sink(open(LOG_PATH, 'a'))
 tlog.add_sink(default_file_sink)
 
 
-stdout_fmt = file_fmt
-stdout_emt = StreamEmitter('stderr')
-stdout_filter = SensibleFilter(success='critical',
+stderr_fmt = file_fmt
+stderr_emt = StreamEmitter('stderr')
+stderr_filter = SensibleFilter(success='critical',
                                failure='debug',
                                exception='debug')
-stdout_sink = SensibleSink(formatter=stdout_fmt,
-                           emitter=stdout_emt,
-                           filters=[stdout_filter])
-tlog.add_sink(stdout_sink)
+stderr_sink = SensibleSink(formatter=stderr_fmt,
+                           emitter=stderr_emt,
+                           filters=[stderr_filter])
+
+
+def enable_debug_log():
+    tlog.add_sink(stderr_sink)

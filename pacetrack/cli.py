@@ -7,7 +7,7 @@ import subprocess
 from boltons.fileutils import mkdir_p
 from face import Command, Flag, face_middleware, UsageError
 
-from .log import tlog, LOG_PATH, JSUB_LOG_PATH
+from .log import tlog, LOG_PATH, JSUB_LOG_PATH, enable_debug_log
 from .update import DEBUG, get_all_campaign_dirs, load_and_update_campaign, PTCampaign
 from ._version import __version__
 
@@ -127,7 +127,7 @@ def main(argv=None):
     cmd.add('--dry-run', parse_as=True, doc='log actions without performing them (e.g., do not remove files)')
 
     # flags
-    cmd.add('--debug', missing=DEBUG)
+    cmd.add('--debug', parse_as=True, missing=DEBUG)
 
     # middlewares
     cmd.add(mw_cli_log)
@@ -135,13 +135,16 @@ def main(argv=None):
     try:
         cmd.run()
     except Exception:
+        # TODO: once face is stable, this can become part of the middleware
         if os.getenv('PACETRACK_ENABLE_DEBUG'):
             import pdb;pdb.post_mortem()
         raise
 
 
 @face_middleware
-def mw_cli_log(next_):
+def mw_cli_log(next_, debug):
+    if debug:
+        enable_debug_log()
     tlog.critical('start').success('started {0}, logging to {1}', os.getpid(), LOG_PATH)
     with tlog.critical('cli', argv=sys.argv):
         return next_()
