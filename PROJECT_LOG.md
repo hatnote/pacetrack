@@ -18,6 +18,12 @@
 * Archive campaign (no longer shows up in list)
 * Incomplete references_by_id KeyError coverage (should probably glom)
 
+Pete's suggestions:
+
+* Display absolute value
+* Downloadable CSV for articles both at start and end
+* Downloadable CSV for the campaign overview (more important than the display!)
+
 ### Deployment
 
 * clear cached data subcommand
