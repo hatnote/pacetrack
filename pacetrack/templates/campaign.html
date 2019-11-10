@@ -59,7 +59,7 @@
           {?latest.result.desc}<p><i>{latest.result.desc}</i></p>{/latest.result.desc}
             <div class="row">
                 <div class="col-1">
-                    <h5>Start:</h5>
+                    <h5>{campaign_start_date}:</h5>
                 </div>
                 <div class="col-11">
                     <div class="progress">
@@ -70,13 +70,13 @@
             </div>
             <div class="row">
                 <div class="col-1">
-                    <h5>Now:</h5>
+                    <h5>{campaign_end_date}:</h5>
                 </div>
 
                 <div class="col-11">
                     <div class="progress">
-                    <!-- <div class="progress-bar" style="width: 5%"></div> -->
-                        <div class="progress-bar progress-bar" style="width: {latest.result.progress|percentage}%">{latest.result.progress|percentage}%</div>
+                    <!-- <div class="progress-bar" style="width: 5%"></div> test?-->
+                        <div class="progress-bar progress-bar" style="width: {latest.result.progress|percentage}%; height: 150px">{latest.result.progress|percentage}%</div>
                     </div>
                 </div>
             </div>
