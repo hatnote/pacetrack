@@ -233,7 +233,7 @@ class PTCampaignState(object):
         article_list = []
         article_title_list = campaign.article_title_list
 
-        base_desc = 'Scanning %s @ %s' % (campaign.name, timestamp.isoformat().split('.')[0])
+        base_desc = u'Scanning %s @ %s' % (campaign.name, timestamp.isoformat().split('.')[0])
         article_title_list = tqdm(article_title_list,
                                   desc=base_desc,
                                   disable=None,  # autodisable on non-tty
@@ -457,7 +457,7 @@ class PTCampaign(object):
         return
 
     def get_summary_ctx(self):
-        spec = {'name': 'name', 
+        spec = {'name': 'name',
                 'campaign_start_date': 'campaign_start_date',
                 'campaign_end_date': 'campaign_end_date',
                 'description': 'description',
