@@ -458,7 +458,8 @@ class PTCampaign(object):
         return
 
     def get_summary_ctx(self):
-        spec = {'name': 'name',
+        spec = {'id': 'id',
+                'name': 'name',
                 'campaign_start_date': 'campaign_start_date',
                 'campaign_end_date': 'campaign_end_date',
                 'description': 'description',
