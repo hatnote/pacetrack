@@ -50,6 +50,8 @@ UPDATED_DT_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 DEBUG = False
 
+DEFAULT_CARD = 'https://upload.wikimedia.org/wikipedia/commons/8/81/WikiSplat.png'
+
 # these paths are relative to the campaign directory
 STATE_FULL_PATH_TMPL = '/data/%Y%m/state_full_%Y%m%d_%H%M%S.json.gz'
 STATE_PATH_TMPL = '/data/%Y%m/state_%Y%m%d_%H%M%S.json'
@@ -167,6 +169,9 @@ class PTCampaignState(object):
 
     @classmethod
     def from_json_path(cls, campaign, json_path, full):
+        if not json_path:
+            raise ValueError('missing json_path')
+
         with open(json_path, 'rb') as f:
             if json_path.endswith('.gz'):
                 f = gzip.GzipFile(fileobj=f)
@@ -353,6 +358,7 @@ class PTCampaign(object):
     goals = attr.ib(repr=False)
     article_list_config = attr.ib(repr=False)
 
+    card_image = attr.ib(default=DEFAULT_CARD)
     disabled = attr.ib(default=False, repr=False)
     fetch_frequency = attr.ib(default=datetime.timedelta(seconds=3600))
     save_frequency = attr.ib(default=datetime.timedelta(days=1))
@@ -450,6 +456,17 @@ class PTCampaign(object):
 
         return
 
+    def get_summary_ctx(self):
+        spec = {'name': 'name', 
+                'campaign_start_date': 'campaign_start_date',
+                'campaign_end_date': 'campaign_end_date',
+                'description': 'description',
+                'save_date': 'latest_state.timestamp',
+                'overall_progress': 'latest_state.campaign_results.ratio',
+                'card_image': 'card_image'}
+        ret = glom(self, spec)
+        return ret
+
     def render_report(self):
         start_state = [{'name': k, 'result': v} for k, v in self.start_state.goal_results.items()]
         start_state.sort(key=lambda g: g['name'])
@@ -515,6 +532,7 @@ class PTCampaign(object):
             html_f.write(article_list_html.encode('utf-8'))
             json.dump(ctx, json_f, indent=2, sort_keys=True)
         return
+
 
     @tlog.wrap('debug')
     def prune_by_frequency(self, dry_run=False):
@@ -633,6 +651,14 @@ def get_all_campaign_dirs(abspath=True):
     ret = [CAMPAIGNS_PATH + cd if abspath else cd for cd in os.listdir(CAMPAIGNS_PATH) if not cd.startswith('.')]
     return sorted(ret)
 
+
+def render_home(ptcs):
+    ctx = glom(ptcs, {'campaigns': [T.get_summary_ctx()]})
+    index_html = ASHES_ENV.render('index.html', ctx)
+    index_path = STATIC_PATH + '/index.html'
+    with atomic_save(index_path) as f:
+        f.write(index_html.encode('utf-8'))
+    return
 
 
 if __name__ == '__main__':

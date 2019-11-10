@@ -6,6 +6,7 @@ name: "WikiCite NoW 2018"
 lang: en
 disabled: False
 description: "A project to improve Wikipedia's coverage of newspapers."
+card_image: https://upload.wikimedia.org/wikipedia/commons/f/f4/U.S._newspapers_with_Wikidata_entries.png
 contacts:
   - "User:Peteforsyth"
 wikiproject_name: "WikiProject_Newspapers"

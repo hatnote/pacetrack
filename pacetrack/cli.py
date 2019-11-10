@@ -6,9 +6,10 @@ import subprocess
 
 from boltons.fileutils import mkdir_p
 from face import Command, Flag, face_middleware, UsageError
+from glom import glom, T
 
 from .log import tlog, LOG_PATH, JSUB_LOG_PATH, enable_debug_log
-from .update import DEBUG, get_all_campaign_dirs, load_and_update_campaign, PTCampaign
+from .update import DEBUG, get_all_campaign_dirs, load_and_update_campaign, PTCampaign, render_home
 from ._version import __version__
 
 
@@ -100,12 +101,14 @@ def list_states(posargs_):  # TODO
 def render_all():
     "Render reports for all campaigns using the freshest data already fetched."
     campaign_dirs = get_all_campaign_dirs()
+    all_ptcs = []
     for cd in campaign_dirs:
         with tlog.critical('load_campaign_dir', path=cd) as _act:
             ptc = PTCampaign.from_path(cd)
             _act['name'] = ptc.name
         ptc.render()
-        # TODO: render home
+        all_ptcs.append(ptc)
+    render_home(all_ptcs)
     return
 
 
