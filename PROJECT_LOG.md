@@ -16,6 +16,7 @@
 * "This campaign ended ..." banner
 * Allow referencing campaigns by unambiguous id prefix
 * Archive campaign (no longer shows up in list)
+* Incomplete references_by_id KeyError coverage (should probably glom)
 
 ### Deployment
 

@@ -27,7 +27,7 @@ def _build_jsub_update(args_, force, campaign_id):
     jsub_out_path = jsub_campaign_logs_path + campaign_id + '_out.log'
     jsub_err_path = jsub_campaign_logs_path + campaign_id + '_err.log'
 
-    ret = ['jsub', '-once', '-N', name, '-o', jsub_out_path, '-e', jsub_err_path]
+    ret = ['jsub', '-mem', '2048m', '-once', '-N', name, '-o', jsub_out_path, '-e', jsub_err_path]
 
     ret.append(args_.argv[0])  # executable
     ret.append('update')
