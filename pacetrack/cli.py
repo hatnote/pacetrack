@@ -127,7 +127,7 @@ def main(argv=None):
     cmd.add('--dry-run', parse_as=True, doc='log actions without performing them (e.g., do not remove files)')
 
     # flags
-    cmd.add('--debug', parse_as=True, missing=DEBUG)
+    cmd.add('--debug', doc='increase logging level', parse_as=True, missing=DEBUG)
 
     # middlewares
     cmd.add(mw_cli_log)
