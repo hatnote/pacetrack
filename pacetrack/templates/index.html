@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Pacetrack</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/css/bootstrap.min.css">
+        <style>
+            a.project,
+            a.project:hover {
+                color: inherit;
+                text-decoration: inherit;
+            }
+        </style>
+        <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/css/bootstrap-theme.min.css">
+
+        <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/font-awesome/4.2.0/css/font-awesome.min.css">
+
+        <link rel="stylesheet" href="../../main.css">
+
+    </head>
+    <body>
+
+    <nav class="navbar navbar-light bg-dark">
+        <div class="container">
+            <a class="navbar-brand text-light" href="#"><i class="fa fa-car"></i> Pacetracker</a>
+
+            <ul class="nav justify-content-end text-light">
+              <li class="nav-item">
+                <a class="nav-link text-light" href="#"><i class="fa fa-book"></i> About</a>
+              </li>
+            </ul>
+        </div>
+    </nav>
+
+
+
+    <div class="jumbotron">
+        <div class="container">
+            <h1>Pacetrack<small>— WikiProject improvement campaigns</small></h1>
+            
+            <p>Pacetrack is a progress tracking tool for WikiProject improvement campaigns, started at <a href="#">WikiCite 2018</a>. It lets you measure features of articles within your campaign, so you can find tasks and get work done!</p>
+                            
+            <p><a class="btn btn-primary btn-lg pull-right" role="button" href="#">Learn how to start a campaign</a></p>
+
+        </div>
+    </div>
+    
+    <!-- Campaigns -->
+
+    <div class="container">
+        <div class="row">
+            {#campaigns}
+            <div class="col-sm-6">
+                <div class="card">
+                    <img class="card-img-top" src="{card_image}" alt="Illustration of {name}">
+                    <div class="card-body">
+                        <h5 class="card-title"><a href="#">{name}</a></h5>
+                        <p class="card-text lead">{campaign_start_date} - {campaign_end_date}</p>
+                        <p class="card-text">{description}</p>
+                        <div class="progress">
+                            <div class="progress-bar" style="width: {overall_progress|percentage}%">
+                                {overall_progress|percentage}%
+                            </div>
+                        </div>
+                        <p class="card-text"><small class="text-muted">Last updated {save_date}</small></p>
+                    </div>
+                </div>
+            </div>
+            {/campaigns}
+        </div>
+    </div>
+
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/js/bootstrap.min.js"></script>
+    <script src="../../main.js"></script>
+    </body>
+</html>
