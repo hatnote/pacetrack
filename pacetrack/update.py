@@ -233,7 +233,7 @@ class PTCampaignState(object):
         article_list = []
         article_title_list = campaign.article_title_list
 
-        base_desc = u'Scanning %s @ %s' % (campaign.name, timestamp.isoformat().split('.')[0])
+        base_desc = 'Scanning %s @ %s' % (campaign.name, timestamp.isoformat().split('.')[0])
         article_title_list = tqdm(article_title_list,
                                   desc=base_desc,
                                   disable=None,  # autodisable on non-tty
@@ -249,7 +249,8 @@ class PTCampaignState(object):
             return
 
         for title in article_title_list:
-            article_title_list.set_description(base_desc + ' ({:16.16})'.format(title))
+            new_desc = base_desc + ' ({:16.16})'.format(title)
+            article_title_list.set_description(new_desc.encode('utf8'))
             pta = PTArticle(lang=campaign.lang, title=title, timestamp=timestamp)
             pta.talk_title = 'Talk:' + title
             async_pta_update(pta, {'rev_id': metrics.get_revid,
