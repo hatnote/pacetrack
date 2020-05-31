@@ -8,8 +8,8 @@ Track the following features in your Wikiproject:
  - [x] Exists on Wikidata
  - [x] Has infobox
  - [x] Infobox is Wikidata-powered
- - [x] Number of citations
- - [x] Percentage of citations are Wikidata-powered
+ - [ ] Number of citations - (need replacement for `/api/rest_v1/page/references/`)
+ - [ ] Percentage of citations are Wikidata-powered
  - [ ] Which maintence templates
  - [ ] How many categories
  - [x] Is in Wikiproject:Newspapers
