@@ -48,11 +48,11 @@ goals:
     target:
       value: 1
       cmp: bool
-  - name: "Citation count"
-    metric: ref_count
-    target:
-      value: 10
-      ratio: 1.0
+  # - name: "Citation count"
+  #   metric: ref_count
+  #   target:
+  #     value: 10
+  #     ratio: 1.0
   - name: "Exists on Wikidata"
     metric: wikidata_item
     target:

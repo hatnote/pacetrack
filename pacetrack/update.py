@@ -250,7 +250,7 @@ class PTCampaignState(object):
 
         for title in article_title_list:
             new_desc = base_desc + ' ({:16.16})'.format(title)
-            article_title_list.set_description(new_desc.encode('utf8'))
+            article_title_list.set_description(new_desc)
             pta = PTArticle(lang=campaign.lang, title=title, timestamp=timestamp)
             pta.talk_title = 'Talk:' + title
             async_pta_update(pta, {'rev_id': metrics.get_revid,

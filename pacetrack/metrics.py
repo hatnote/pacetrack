@@ -245,6 +245,8 @@ def get_wikiproject(wikiproject, talk_revid):
 
 
 def _get_citations(title, old_id):
+    # This API was depricated: 
+    # https://phabricator.wikimedia.org/T247991
     title = title.replace(' ', '_')  # rest endpoint doesn't like url encoded spaces
     api_url = REF_API_BASE_URL.child(title, unicode(old_id))
 
