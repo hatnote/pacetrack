@@ -10,6 +10,15 @@
         <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/css/bootstrap-theme.min.css">
         <link rel="stylesheet" href="https://tools-static.wmflabs.org/cdnjs/ajax/libs/font-awesome/4.2.0/css/font-awesome.min.css">
 
+        <style>
+            .progress-date {
+                text-align: right;
+            }
+            .progress {
+                margin: 0;
+            }
+        </style>
+
     </head>
 
     <body class="bg-light">
@@ -46,7 +55,7 @@
             <li>Organized by: {#contacts}<a href="#">{.}</a>{/contacts}</li>
             <li>Last updated: {date_updated}</li>
         </ul>
-        <p><a href="articles.html" class="btn btn-primary">Article list</a> <a href="#" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a></p>
+        <p><a href="articles.html" class="btn btn-primary">Article list</a> <a href="articles.json" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a></p>
         <p></p>
     </div>
 </div>
@@ -58,10 +67,10 @@
           <h3>{latest.result.name}</h3>
           {?latest.result.desc}<p><i>{latest.result.desc}</i></p>{/latest.result.desc}
             <div class="row">
-                <div class="col-1">
-                    <h5>{campaign_start_date}:</h5>
+                <div class="col-2">
+                    <p class="progress-date">{campaign_start_date}:</p>
                 </div>
-                <div class="col-11">
+                <div class="col-10">
                     <div class="progress">
                     <!-- <div class="progress-bar" style="width: 5%"></div> -->
                         <div class="progress-bar progress-bar-striped bg-warning" style="width: {start.result.progress|percentage}%">{start.result.progress|percentage}%</div>
@@ -69,19 +78,28 @@
                 </div>
             </div>
             <div class="row">
-                <div class="col-1">
-                    <h5>{campaign_end_date}:</h5>
+                <div class="col-2">
+                    <p class="progress-date">{campaign_end_date}:</p>
                 </div>
 
-                <div class="col-11">
-                    <div class="progress">
+                <div class="col-10">
+                    <div class="progress" style="height: 32px">
                     <!-- <div class="progress-bar" style="width: 5%"></div> test?-->
-                        <div class="progress-bar progress-bar" style="width: {latest.result.progress|percentage}%; height: 150px">{latest.result.progress|percentage}%</div>
+                        <div class="progress-bar progress-bar" style="width: {latest.result.progress|percentage}%; height: 32px">{latest.result.progress|percentage}%</div>
                     </div>
                 </div>
             </div>
+            <div id="more-{latest.name}" class="col-12 collapse">
+                <h6>Details</h6>
+                <ul id="more-overview">
+                    <li>At the start, on {campaign_start_date}, <strong>{start.result.done_count} articles</strong> met the goal</li>
+                    <li>At our last update, on {date_updated}, <strong>{latest.result.done_count} articles</strong> met the goal</li>
+                    <li>There are <strong>{latest.result.not_done_count} articles</strong> left to improve</a></li>
+                </ul>
+            </div>
             <div class="col-12">
-                {@ne key=latest.result.not_done_count value=0}<p>{latest.result.not_done_count} article{@ne key=latest.result.not_done_count value=1}s{/ne} left to improve.</p>{/ne}
+                <p><a href="#more-{latest.name}" class="btn btn-outline-primary" data-toggle="collapse">Details</a>
+                <a href="articles.html?sort_by={latest.name}" class="btn btn-primary">Article list</a></p>
             </div>
         </div>
 

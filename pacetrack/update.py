@@ -513,6 +513,8 @@ class PTCampaign(object):
 
     def render_article_list(self):
         all_results = self._get_all_results()
+        for goal in self.goals:
+            goal['slug'] = slugify(goal['name'])
         ctx = {'name': self.name,
                'lang': self.lang,
                'description': self.description,
@@ -524,7 +526,7 @@ class PTCampaign(object):
                'date_updated': datetime.datetime.utcnow().strftime(UPDATED_DT_FORMAT),
                'article_count': len(self.article_title_list),
                'all_results': all_results,
-               'goals': [{'name': 'Article'}] + sorted(self.goals, key=lambda s: s['name'])}
+               'goals': [{'name': 'Article', 'slug': 'title'}] + sorted(self.goals, key=lambda s: s['name'])}
         campaign_static_path = STATIC_PATH + 'campaigns/%s/' % self.id
         article_list_html = ASHES_ENV.render('articles.html', ctx)
         article_list_path = campaign_static_path + 'articles.html'

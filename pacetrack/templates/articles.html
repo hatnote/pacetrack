@@ -47,14 +47,14 @@
             <li>Organized by: {#contacts}<a href="#">{.}</a>{/contacts}</li>
             <li>Last updated: {date_updated}</li>
         </ul>
-        <p><a href="index.html" class="btn btn-primary">Campaign overview</a> <a href="#" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a></p>
+        <p><a href="index.html" class="btn btn-primary">Campaign overview</a> <a href="articles.json" class="btn btn-outline-primary"><i class="fa fa-download"></i> Download project summary</a></p>
         <p></p>
         <h2>Article list</h2>
         <table class="table hover" id="articles">
             <thead>
                 <tr>
                     {#goals}
-                    <th scope="col" title="{desc}">{name}</th>
+                    <th scope="col" class="{slug}">{name}</th>
                     {/goals}
                 </tr>
             </thead>
@@ -77,9 +77,30 @@
     <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/datatables/1.10.19/js/dataTables.bootstrap4.min.js"></script>
     <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/twitter-bootstrap/4.1.0/js/bootstrap.min.js"></script>
     <script>
+        var getUrlParam = function getUrlParam(sParam) {
+            var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+                sURLVariables = sPageURL.split('&'),
+                sParameterName,
+                i;
+
+            for (i = 0; i < sURLVariables.length; i++) {
+                sParameterName = sURLVariables[i].split('=');
+
+                if (sParameterName[0] === sParam) {
+                    return sParameterName[1] === undefined ? true : sParameterName[1];
+                }
+            }
+        };
+
         $(document).ready(function() {
-            $('#articles').DataTable();
-        } );
+            var table = $('#articles').DataTable();
+            var sort_by = getUrlParam('sort_by');
+
+            if (sort_by) {
+                table.columns('.' + sort_by).order('asc').draw();
+            }
+            
+        });
         </script>
     </body>
 </html>
