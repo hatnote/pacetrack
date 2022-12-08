@@ -1,7 +1,7 @@
 ashes==17.0.0
 attrs==18.2.0
 boltons==19.3.0
-certifi==2019.9.11
+certifi==2022.12.7
 cffi==1.12.2
 chardet==3.0.4
 contextlib2==0.5.5
